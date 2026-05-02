@@ -6,3 +6,8 @@
 /.vs/SparseNeuronalNetworkInferenceEngine.slnx/FileContentIndex
 /SparseNeuronalNetworkInferenceEngine/obj
 /SparseNeuronalNetworkInferenceEngine/bin/Debug/net10.0
+/.vs/SparseNeuronalNetworkInferenceEngine.slnx/DesignTimeBuild
+/Math.Tensor/bin/Debug/net10.0
+/Math.Tensor/obj
+/Meth.Tensor.Tests/bin/Debug/net10.0
+/Meth.Tensor.Tests/obj
