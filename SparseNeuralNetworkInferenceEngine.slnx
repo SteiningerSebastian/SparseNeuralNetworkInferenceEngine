@@ -1,5 +1,5 @@
 <Solution>
   <Project Path="Math.Tensor/Math.Tensor.csproj" />
   <Project Path="Meth.Tensor.Tests/Meth.Tensor.Tests.csproj" />
-  <Project Path="SparseNeuronalNetworkInferenceEngine/SparseNeuronalNetworkInferenceEngine.csproj" />
+  <Project Path="SparseNeuralNetworkInferenceEngine/SparseNeuralNetworkInferenceEngine.csproj" />
 </Solution>
