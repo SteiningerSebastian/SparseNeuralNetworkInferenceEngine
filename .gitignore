@@ -1,0 +1,8 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/SparseNeuronalNetworkInferenceEngine.slnx/v18
+/.vs/SparseNeuronalNetworkInferenceEngine.slnx/FileContentIndex
+/SparseNeuronalNetworkInferenceEngine/obj
+/SparseNeuronalNetworkInferenceEngine/bin/Debug/net10.0
