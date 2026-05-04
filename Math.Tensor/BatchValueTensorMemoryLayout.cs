@@ -6,18 +6,18 @@ using System.Text;
 
 namespace Math.Tensor
 {
-    public class BatchValueTensorMemoryMapper : ITensorMemoryMapper
+    public class BatchValueTensorMemoryLayout : ITensorMemoryLayout
     {
         protected int[] shape;
 
-        public BatchValueTensorMemoryMapper(int[] shape)
+        public BatchValueTensorMemoryLayout(int[] shape)
         {
             this.shape = shape;
         }
 
         public object Clone()
         {
-            return new BatchValueTensorMemoryMapper(shape.ToArray());
+            return new BatchValueTensorMemoryLayout(shape.ToArray());
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

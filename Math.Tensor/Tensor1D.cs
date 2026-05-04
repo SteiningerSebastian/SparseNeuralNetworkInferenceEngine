@@ -17,7 +17,7 @@ namespace Math.Tensor
         public Tensor1D(int length, bool initialize = false, bool alligned = true, bool pageAlligned = false, IEnumerable<T>? values = null) : base()
         {
             shape = [length];
-            mapper = new IdentityTensorMemoryMapper();
+            LayoutMapper = new RowMajorTensorMemoryLayout(shape);
 
             // Can't allign memory to page boundry but not cache line.
             Debug.Assert(!(pageAlligned && !alligned));
@@ -49,39 +49,5 @@ namespace Math.Tensor
         }
 
         public Tensor1D() : base() { } 
-
-        /// <summary>
-        /// Adds the given tensor to the current tensor, element by element.
-        /// </summary>
-        /// <param name="other">The tensor to add.</param>
-        public virtual void Add(Tensor1D<T> other)
-        {
-            EnsureEqualShape(other.shape);
-
-            unsafe
-            {
-                for (int i = 0; i < Length; i += Vector<T>.Count)
-                {
-                    // If the whole vector can't be filled anymore, break;
-                    if(i+Vector<T>.Count > Length)
-                    {
-                        break;
-                    }
-                    T* ptr = data.Pointer + i;
-                    Vector<T> sum = Vector.Load<T>(ptr);
-                    Vector<T> addend = Vector.Load<T>(other.data.Pointer + i);
-                    var result = Vector.Add(sum, addend);
-                    result.Store(ptr);
-                }
-            }
-
-            var tData = this.data.Data;
-            var otherData = other.data.Data;
-            // For the values that could not be handled cleanly with SIMD/Vecotrization
-            for (int i = Length - Length % Vector<T>.Count; i < Length; i++)
-            {
-                tData[i] = tData[i] + otherData[i];
-            }
-        }
     }
 }

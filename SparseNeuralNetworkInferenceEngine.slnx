@@ -1,5 +1,8 @@
 <Solution>
   <Project Path="Math.Tensor/Math.Tensor.csproj" />
   <Project Path="Meth.Tensor.Tests/Meth.Tensor.Tests.csproj" />
+  <Project Path="SparseNeuralNetworkInferenceEngine.Engine/SparseNeuralNetworkInferenceEngine.Engine.csproj" Id="adf84ddb-454a-4a1f-977f-16782dc8b9da" />
+  <Project Path="SparseNeuralNetworkInferenceEngine.General/SparseNeuralNetworkInferenceEngine.General.csproj" Id="eebd494a-1181-4c9a-b23e-7ea5a0b9eaa4" />
   <Project Path="SparseNeuralNetworkInferenceEngine/SparseNeuralNetworkInferenceEngine.csproj" />
+  <Project Path="SparseNeuralNetworkInferenceEninge.Engine.Tests/SparseNeualNetworkInferenceEninge.Engine.Tests.csproj" Id="17e22768-e4aa-497f-a3fb-ec643cf25a76" />
 </Solution>

@@ -24,7 +24,7 @@ namespace Math.Tensor
         /// <summary>
         /// Maps logical indexes to memory positions.
         /// </summary>
-        protected ITensorMemoryMapper mapper;
+        public ITensorMemoryLayout LayoutMapper { get; protected internal set; }
 
         /// <summary>
         /// Allow the indexed access to data.
@@ -60,6 +60,7 @@ namespace Math.Tensor
             }
         }
 
+
         /// <summary>
         /// Access a value at a given index.
         /// </summary>
@@ -68,7 +69,7 @@ namespace Math.Tensor
         public virtual T GetValue(params int[] index)
         {
             EnsureIndexShape(index);
-            return data.Data[mapper.MapToMemory(index)];
+            return data.Data[LayoutMapper.MapToMemory(index)];
         }
 
         /// <summary>
@@ -79,7 +80,7 @@ namespace Math.Tensor
         public virtual void SetValue(T value, params int[] index)
         {
             EnsureIndexShape(index);
-            data.Data[mapper.MapToMemory(index)] = value;
+            data.Data[LayoutMapper.MapToMemory(index)] = value;
         }
 
         /// <summary>
@@ -129,7 +130,7 @@ namespace Math.Tensor
                 Debug.Assert(next, "Enumerable ended without populating whole tensor.");
 
                 // Set the memory to the given value.
-                int offset = mapper.MapToMemory(currentPosition);
+                int offset = LayoutMapper.MapToMemory(currentPosition);
                 spData[offset] = enumerator.Current;
 
                 // Increas the index in the last dimension.
@@ -157,7 +158,7 @@ namespace Math.Tensor
             obj.data = this.data;
             obj.shape = shape;
             obj.Length = this.Length;
-            obj.mapper = (ITensorMemoryMapper)this.mapper.Clone();
+            obj.LayoutMapper = (ITensorMemoryLayout)this.LayoutMapper.Clone();
 
             return obj;
         }
@@ -175,7 +176,7 @@ namespace Math.Tensor
             obj.data = this.data.DeepCopy();
             obj.shape = shape.ToArray();
             obj.Length = this.Length;
-            obj.mapper = (ITensorMemoryMapper)this.mapper.Clone();
+            obj.LayoutMapper = (ITensorMemoryLayout)this.LayoutMapper.Clone();
 
             return obj;
         }

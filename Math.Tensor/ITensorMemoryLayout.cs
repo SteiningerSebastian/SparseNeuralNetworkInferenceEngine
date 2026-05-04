@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Math.Tensor
 {
-    public interface ITensorMemoryMapper: ICloneable
+    public interface ITensorMemoryLayout: ICloneable
     {
         /// <summary>
         /// Maps a given index to a given memory position. (Bijection of index to offset)
