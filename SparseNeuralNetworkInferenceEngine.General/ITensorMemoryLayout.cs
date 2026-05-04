@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
+namespace SparseNeuralNetworkInferenceEngine.General
 {
     public interface ITensorMemoryLayout: ICloneable
     {

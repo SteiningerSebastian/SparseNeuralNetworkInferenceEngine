@@ -5,8 +5,10 @@ using System.Runtime.InteropServices;
 
 namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 {
-    public class Tensor1D<T> : Tensor<T> where T: INumber<T>
+    public class Tensor1D<T> : Tensor<T> where T: unmanaged
     {
+        public Tensor1D():base(){}
+
         /// <summary>
         /// Creates a new one dimensional tensor.
         /// </summary>
@@ -15,8 +17,9 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// <param name="alligned">True if the tensor should be alligned to a cache line.</param>
         /// <param name="pageAlligned">True if the tensor should be alligned to a page boundry.</param>
         /// <param name="values">The values to initialize the thensor to.</param>
-        public Tensor1D(int length, bool initialize = false, bool alligned = true, bool pageAlligned = false, IEnumerable<T>? values = null) : base()
+        public Tensor1D(int length, bool initialize = false, bool alligned = true, bool pageAlligned = false, IEnumerable<T>? values = null, IHardwareAccelerator? accelerator = null) : base()
         {
+            this.accelerator = accelerator;
             shape = [length];
             LayoutMapper = new RowMajorTensorMemoryLayout(shape);
 
@@ -49,6 +52,26 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             values?.ToArray().CopyTo(data.Data);
         }
 
-        public Tensor1D() : base() { } 
+        /// <summary>
+        /// Define what happens when another element is added. (+= only as result is stored in this tensor)
+        /// </summary>
+        /// <param name="operand">The operator to add.</param>
+        public async Task AddAsync(Tensor1D<T> operand)
+        {
+            if(this.accelerator is not null)
+            {
+                if(this.accelerator is IAddAligned acc)
+                {
+                    await acc.AddAsync(this.data.Data, operand.data.Data);
+                    return;
+                }
+            }
+
+            // Simple non accelerated operation.
+            for (int i = 0; i < this.Length; i++)
+            {
+                data.Data[i] += operand.data.Data[i];
+            }
+        }
     }
 }

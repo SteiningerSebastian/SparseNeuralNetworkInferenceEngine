@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SparseNeuralNetworkInferenceEngine.General;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;

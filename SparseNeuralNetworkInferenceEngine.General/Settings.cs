@@ -14,6 +14,11 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <summary>
         /// The size of the kernel in bytes. (Assuming 512bit registers are available.)
         /// </summary>
-        public const int KERNEL_SIZE = 64; 
+        public const int KERNEL_SIZE = 64;
+
+        /// <summary>
+        /// If there are fewer than these operations to do, don't bother with multithreading.
+        /// </summary>
+        public const int SINGEL_THREAD_OPERATION_THRESHOLD = 128;
     }
 }

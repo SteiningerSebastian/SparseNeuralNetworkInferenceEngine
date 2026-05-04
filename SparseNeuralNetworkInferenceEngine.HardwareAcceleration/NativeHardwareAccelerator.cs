@@ -5,8 +5,11 @@ using System.Text;
 
 namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 {
-    public class NativeHardwareAccelerator: IHardwareAccelerator
+    public class NativeHardwareAccelerator : IHardwareAccelerator
     {
-
+        public object Clone()
+        {
+            return new NativeHardwareAccelerator();
+        }
     }
 }

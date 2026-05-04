@@ -1,6 +1,6 @@
 ﻿namespace SparseNeuralNetworkInferenceEngine.General
 {
-    public interface IHardwareAccelerator
+    public interface IHardwareAccelerator: ICloneable
     {
 
     }

@@ -8,12 +8,12 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
     {
         protected record struct WorkItem
         {
-            public Func<int, object> Func { get; init; }
-            public Action<object> Done { get; init; }
+            public Func<int, object?> Func { get; init; }
+            public Action<object?> Done { get; init; }
             public Action Canceled { get; init; }
             public CancellationToken Ct { get; init; }
 
-            public WorkItem(Func<int, object> func, Action<object> done, Action canceled, CancellationToken ct)
+            public WorkItem(Func<int, object?> func, Action<object?> done, Action canceled, CancellationToken ct)
             {
                 Func = func;
                 Done = done;
@@ -27,6 +27,8 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
 
         /// <inheritdoc/>
         public int Capacity { get; init; }
+
+        public int NumberOfThreads => threads.Length;
 
         /// <summary>
         /// The threads used to execute the Scheduled work.
@@ -56,6 +58,7 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
         /// <param name="priority">The priority of the threads to use.</param>
         public ThreadPool(int threads, int capacity, ThreadPriority priority = ThreadPriority.Normal, CancellationToken ct = default)
         {
+            Capacity = capacity;
             semaphore = new SemaphoreSlim(0, capacity);
             this.ct = ct;
 
@@ -80,9 +83,27 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
         /// <inheritdoc/>
         public Task<K>? Schedule<K>(Func<int,K> func, CancellationToken ct = default)
         {
+            if (workItems.Count >= Capacity)
+                return null;
+
             var tcs = new TaskCompletionSource<K>();
 
-            workItems.Enqueue(new((i) => (object?)func(i)!, (object o) => tcs.SetResult((K)o), ()=>tcs.SetCanceled(ct), ct));
+            workItems.Enqueue(new((i) => (object?)func(i)!, (object? o) => tcs.SetResult((K)o!), ()=>tcs.SetCanceled(ct), ct));
+
+            semaphore.Release();
+
+            return tcs.Task;
+        }
+
+        public Task? Schedule(Action<int> func, CancellationToken cts = default)
+        {
+            if (workItems.Count >= Capacity)
+                return null;
+
+
+            var tcs = new TaskCompletionSource();
+
+            workItems.Enqueue(new((i) => { func(i); return null; }, (object? o) => tcs.SetResult(), () => tcs.SetCanceled(ct), ct));
 
             semaphore.Release();
 
@@ -113,7 +134,7 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
                         continue;
                     }
 
-                    var result = workItem.Func.Invoke(threadId);
+                    object? result = workItem.Func.Invoke(threadId);
 
                     // Work has been completed, set the result for the associated task.
                     workItem.Done(result);

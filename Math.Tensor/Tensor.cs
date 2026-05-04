@@ -5,7 +5,7 @@ using System.Numerics;
 
 namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 {
-    public abstract class Tensor<T> : ICloneable, IEnumerable<T> where T : INumber<T>
+    public abstract class Tensor<T> : ICloneable, IEnumerable<T>, ITensor<T> where T : unmanaged
     {
         /// <summary>
         /// The shape of the Tensor, must be set by the children!!
@@ -25,7 +25,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// <summary>
         /// The HardwareAccelerator to use.
         /// </summary>
-        protected IHardwareAccelerator hardware;
+        protected IHardwareAccelerator? accelerator;
 
         /// <summary>
         /// Maps logical indexes to memory positions.
@@ -64,13 +64,6 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             {
                 throw new NotSupportedException("Only single or double precision floating point numbers are accepted.");
             }
-
-
-        }
-
-        public Tensor(IHardwareAccelerator hardwareAccelerator)
-        {
-            this.hardware = hardwareAccelerator;
         }
 
         /// <summary>
@@ -171,6 +164,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             obj.shape = shape;
             obj.Length = this.Length;
             obj.LayoutMapper = (ITensorMemoryLayout)this.LayoutMapper.Clone();
+            obj.accelerator = accelerator;
 
             return obj;
         }
@@ -189,6 +183,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             obj.shape = shape.ToArray();
             obj.Length = this.Length;
             obj.LayoutMapper = (ITensorMemoryLayout)this.LayoutMapper.Clone();
+            obj.accelerator = (IHardwareAccelerator?)accelerator?.Clone();
 
             return obj;
         }

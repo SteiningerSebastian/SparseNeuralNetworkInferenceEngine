@@ -1,4 +1,7 @@
-﻿using SparseNeuralNetworkInferenceEngine.Math.Tensor;
+﻿using SparseNeuralNetworkInferenceEngine.Engine;
+using SparseNeuralNetworkInferenceEngine.General;
+using SparseNeuralNetworkInferenceEngine.HardwareAcceleration;
+using SparseNeuralNetworkInferenceEngine.Math.Tensor;
 
 namespace Meth.Tensor.Tests
 {
@@ -37,6 +40,39 @@ namespace Meth.Tensor.Tests
                 Assert.Equal(i, tensor[i]);
                 Assert.Equal(i, tensorC[i]);
                 Assert.Equal(0, tensorDC[i]);
+            }
+        }
+
+        [Theory]
+        [InlineData(3)]
+        [InlineData(12)]
+        [InlineData(125)]
+        [InlineData(1254)]
+        [InlineData(46482)]
+        [InlineData(646483)]
+
+        public async Task Add(int n)
+        {
+            IThreadPool pool = new SparseNeuralNetworkInferenceEngine.Engine.ThreadPool(8, 1024);
+            IHardwareAccelerator accelerator = new AVXHardwareAccelerator(pool);
+
+            IInferenceEngine engine = new InferenceEngine(accelerator);
+            Tensor1D<float> a = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>(Enumerable.Range(0, n).Select(a => (float)a), n);
+            Tensor1D<float> b = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>(Enumerable.Range(0, n).Select(a => (float)a), n);
+            Tensor1D<float> c = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>(Enumerable.Range(0, n).Select(a => -(float)a), n);
+
+            await a.AddAsync(b);
+
+            for (int i = 0; i < n; i++)
+            {
+                Assert.Equal(i * 2, a[i]);
+            }
+
+            await a.AddAsync(c);
+
+            for (int i = 0; i < n; i++)
+            {
+                Assert.Equal(i, a[i]);
             }
         }
     }
