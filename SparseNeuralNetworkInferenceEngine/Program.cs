@@ -1,4 +1,4 @@
-﻿using Math.Tensor;
+﻿using SparseNeuralNetworkInferenceEngine.Math.Tensor;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 

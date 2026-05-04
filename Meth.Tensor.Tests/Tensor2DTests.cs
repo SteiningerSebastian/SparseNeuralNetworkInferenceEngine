@@ -1,4 +1,4 @@
-﻿using Math.Tensor;
+﻿using SparseNeuralNetworkInferenceEngine.Math.Tensor;
 using Newtonsoft.Json.Linq;
 
 namespace Meth.Tensor.Tests

@@ -1,8 +1,9 @@
-﻿using System.Collections;
+﻿using SparseNeuralNetworkInferenceEngine.General;
+using System.Collections;
 using System.Diagnostics;
 using System.Numerics;
 
-namespace Math.Tensor
+namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 {
     public abstract class Tensor<T> : ICloneable, IEnumerable<T> where T : INumber<T>
     {
@@ -20,6 +21,11 @@ namespace Math.Tensor
         /// The alligned memory to be used to store the tensor.
         /// </summary>
         protected NativeMemoryOwner<T> data;
+
+        /// <summary>
+        /// The HardwareAccelerator to use.
+        /// </summary>
+        protected IHardwareAccelerator hardware;
 
         /// <summary>
         /// Maps logical indexes to memory positions.
@@ -58,8 +64,14 @@ namespace Math.Tensor
             {
                 throw new NotSupportedException("Only single or double precision floating point numbers are accepted.");
             }
+
+
         }
 
+        public Tensor(IHardwareAccelerator hardwareAccelerator)
+        {
+            this.hardware = hardwareAccelerator;
+        }
 
         /// <summary>
         /// Access a value at a given index.

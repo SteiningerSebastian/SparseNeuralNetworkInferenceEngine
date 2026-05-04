@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace SparseNEuronalNetworkInferenceEngine.Engine
+namespace SparseNeuralNetworkInferenceEngine.General
 {
     public interface IThreadPool
     {

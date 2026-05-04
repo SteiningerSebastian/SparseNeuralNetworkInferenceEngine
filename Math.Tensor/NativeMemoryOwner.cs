@@ -6,7 +6,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Math.Tensor
+namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 {
     // Inspired by: https://learn.microsoft.com/en-us/dotnet/api/system.buffers.memorymanager-1?view=net-10.0
 

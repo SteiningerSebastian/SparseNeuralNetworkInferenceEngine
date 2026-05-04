@@ -1,8 +1,9 @@
-﻿using System.Diagnostics;
+﻿using SparseNeuralNetworkInferenceEngine.General;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-namespace Math.Tensor
+namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 {
     public class Tensor1D<T> : Tensor<T> where T: INumber<T>
     {

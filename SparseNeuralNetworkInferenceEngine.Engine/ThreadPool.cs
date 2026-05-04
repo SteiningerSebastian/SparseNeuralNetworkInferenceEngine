@@ -1,7 +1,8 @@
-﻿using System.Collections.Concurrent;
+﻿using SparseNeuralNetworkInferenceEngine.General;
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 
-namespace SparseNEuronalNetworkInferenceEngine.Engine
+namespace SparseNeuralNetworkInferenceEngine.Engine
 {
     public class ThreadPool : IThreadPool
     {

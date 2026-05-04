@@ -1,8 +1,9 @@
-﻿using SparseNEuronalNetworkInferenceEngine.Engine;
+﻿using SparseNeuralNetworkInferenceEngine.Engine;
+using SparseNeuralNetworkInferenceEngine.General;
 using System.Collections.Concurrent;
-using ThreadPool = SparseNEuronalNetworkInferenceEngine.Engine.ThreadPool;
+using ThreadPool = SparseNeuralNetworkInferenceEngine.Engine.ThreadPool;
 
-namespace SparseNeuronalNetworkInferenceEninge.Engine.Tests
+namespace SparseNeuralNetworkInferenceEninge.Engine.Tests
 {
     public class ThreadPoolTests
     {

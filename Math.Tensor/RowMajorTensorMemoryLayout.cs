@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace Math.Tensor
+namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 {
     public class RowMajorTensorMemoryLayout : ITensorMemoryLayout
     {

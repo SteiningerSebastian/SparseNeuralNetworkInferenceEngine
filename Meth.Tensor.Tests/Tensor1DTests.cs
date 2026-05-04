@@ -1,4 +1,4 @@
-﻿using Math.Tensor;
+﻿using SparseNeuralNetworkInferenceEngine.Math.Tensor;
 
 namespace Meth.Tensor.Tests
 {

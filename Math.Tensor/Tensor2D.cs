@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Text;
 
-namespace Math.Tensor
+namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 {
     public class Tensor2D<T> : Tensor1D<T> where T : INumber<T>
     {

@@ -4,10 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Math.Tensor\SparseNeuralNetworkInferenceEngine.Math.Tensor.csproj" />
     <ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.General\SparseNeuralNetworkInferenceEngine.General.csproj" />
   </ItemGroup>
 

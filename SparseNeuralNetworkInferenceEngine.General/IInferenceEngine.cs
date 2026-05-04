@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace SparseNEuronalNetworkInferenceEngine.Engine
+namespace SparseNeuralNetworkInferenceEngine.General
 {
-    internal interface IInferenceEngine
+    public interface IInferenceEngine
     {
         public IThreadPool ThreadPool { get; }
 

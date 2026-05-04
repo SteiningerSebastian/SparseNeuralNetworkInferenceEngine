@@ -1,10 +1,11 @@
-﻿using System;
+﻿using SparseNeuralNetworkInferenceEngine.General;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace Math.Tensor
+namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 {
     public class BatchValueTensorMemoryLayout : ITensorMemoryLayout
     {

@@ -8,6 +8,10 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.General\SparseNeuralNetworkInferenceEngine.General.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<RuntimeHostConfigurationOption Include="System.Runtime.Intrinsics.X86.Avx512.Enabled" Value="true" />
 	</ItemGroup>
 

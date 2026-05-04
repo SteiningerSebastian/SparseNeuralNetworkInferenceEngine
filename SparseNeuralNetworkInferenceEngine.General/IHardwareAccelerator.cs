@@ -1,6 +1,6 @@
 ﻿namespace SparseNeuralNetworkInferenceEngine.General
 {
-    public class Class1
+    public interface IHardwareAccelerator
     {
 
     }

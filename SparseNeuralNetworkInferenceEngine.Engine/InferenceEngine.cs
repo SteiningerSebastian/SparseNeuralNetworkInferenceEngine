@@ -1,12 +1,13 @@
-﻿using Math.Tensor;
+﻿using SparseNeuralNetworkInferenceEngine.Math.Tensor;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
+using SparseNeuralNetworkInferenceEngine.General;
 
-namespace SparseNEuronalNetworkInferenceEngine.Engine
+namespace SparseNeuralNetworkInferenceEngine.Engine
 {
-    public class InferenceEngine : IInferenceEngine
+    public class InferenceEngine : IInferenceEngine 
     {
         public IThreadPool ThreadPool { get; }
 
