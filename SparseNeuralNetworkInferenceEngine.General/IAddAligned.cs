@@ -13,6 +13,6 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <typeparam name="T">Float or Double.</typeparam>
         /// <param name="addend1">The first slan of values.</param>
         /// <param name="addend2">The second span of values.</param>
-        public Task AddAsync<T>(Span<T> addend1, Span<T> addend2) where T: INumber<T>;
+        public Task AddAsync<T>(Span<T> addend1, Span<T> addend2) where T: unmanaged;
     }
 }

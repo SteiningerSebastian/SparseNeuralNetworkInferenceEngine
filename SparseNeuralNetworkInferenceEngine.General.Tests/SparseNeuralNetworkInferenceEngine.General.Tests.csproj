@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.Engine\SparseNeuralNetworkInferenceEngine.Engine.csproj" />
+    <ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.General\SparseNeuralNetworkInferenceEngine.General.csproj" />
   </ItemGroup>
 
   <ItemGroup>

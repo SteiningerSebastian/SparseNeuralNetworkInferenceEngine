@@ -6,7 +6,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
+namespace SparseNeuralNetworkInferenceEngine.General
 {
     // Inspired by: https://learn.microsoft.com/en-us/dotnet/api/system.buffers.memorymanager-1?view=net-10.0
 
@@ -48,6 +48,17 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             this.alignment = alignment;
             this.pointer = NativeMemory.AlignedAlloc(length * typeSize, alignment);
         }
+
+        public NativeMemoryOwner(void* pointer, nuint length, nuint typeSize, nuint alignment, bool disposed)
+        {
+            this.pointer = pointer;
+            this.length = length;
+            this.typeSize = typeSize;
+            this.alignment = alignment;
+            this.disposed = disposed;
+        }
+
+
 
         /// <inheritdoc/>
         public override Span<T> GetSpan()

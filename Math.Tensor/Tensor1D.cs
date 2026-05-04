@@ -70,8 +70,22 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             // Simple non accelerated operation.
             for (int i = 0; i < this.Length; i++)
             {
-                data.Data[i] += operand.data.Data[i];
+                if (typeof(T) == typeof(float))
+                {
+                    var a1 = MemoryMarshal.Cast<T, float>(this.data.Data);
+                    var a2 = MemoryMarshal.Cast<T, float>(operand.data.Data);
+                    a1[i] += a2[i];
+
+                }
+                else
+                {
+                    var a1 = MemoryMarshal.Cast<T, double>(this.data.Data);
+                    var a2 = MemoryMarshal.Cast<T, double>(operand.data.Data);
+                    a1[i] += a2[i];
+                }
             }
         }
+
+        public Span<T> GetValues() => data.Data;
     }
 }

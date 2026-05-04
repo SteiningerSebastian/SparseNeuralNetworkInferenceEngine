@@ -16,6 +16,6 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="weights">The weights tensor.</param>
         /// <param name="bias">The bias tensor.</param>
         /// <param name="activations">The result is stored in the result Tensor.</param>
-        public Task FusedMultiplyAddReLU(int batches, int[] weightsShape, Span<float> inputs, Span<float> weights, Span<float> bias, Span<float> activations, CancellationToken ct = default);
+        public Task FusedMultiplyAddReLU(int batches, int[] weightsShape, Span<float> inputs, Span<float> weights, Span<float> bias, NativeMemoryOwner<float> activations, CancellationToken ct = default);
     }
 }

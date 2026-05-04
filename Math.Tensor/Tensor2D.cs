@@ -46,13 +46,12 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 
             // Making sure the layout of the Tensor matches the supported layout for the tensors
             Debug.Assert(weights.LayoutMapper.GetType() ==  typeof(WeightsTensorMemoryMapper), "Expected WeightsTensorMemoryMapper for weight tensor.");
-            Debug.Assert(bias.LayoutMapper.GetType() == typeof(BatchValueTensorMemoryLayout), "Expected BatchValueTensorMemoryMapper for bais tensor.");
+            Debug.Assert(bias.LayoutMapper.GetType() == typeof(RowMajorTensorMemoryLayout), "Expected RowMajorTensorMemoryLayout for bais tensor.");
             Debug.Assert(result.LayoutMapper.GetType() == typeof(BatchValueTensorMemoryLayout), "Expected BatchValueTensorMemoryMapper for result tensor.");
 
             // Making sure their shape matches.
             Debug.Assert(weights.Shape[0] == Shape[1], $"Unable to multiply tensors of shape ({string.Join(',', Shape)}) and ({string.Join(',', Shape)}).");
             Debug.Assert(Shape[0] == result.Shape[0], $"Unable to store result in tensor of shape ({string.Join(',', result.Shape)})");
-            Debug.Assert(bias.Shape[0] == Shape[0], $"Unable to add tensor of shape ({string.Join(',', bias.Shape)}) to tensor of shape ({string.Join(',', result.Shape)}).");
 
             Debug.Assert(weights.Shape[0] % 16 == 0 && weights.Shape[1] % 16 == 0, "Shape of weights must be divisible by 16.");
 
@@ -62,7 +61,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             {
                 Span<float> inputs = MemoryMarshal.Cast<T, float>(data.Data);
 
-                acc.FusedMultiplyAddReLU(shape[0], weights.shape, inputs, weights.data.Data, ((Tensor2D<float>)bias).data.Data, result.data.Data);
+                acc.FusedMultiplyAddReLU(shape[0], weights.shape, inputs, weights.data.Data, bias.GetValues(), result.data);
                 return;
             }
 

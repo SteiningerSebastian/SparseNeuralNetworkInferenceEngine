@@ -19,7 +19,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="values">If set the enumerable to load into the tensor. </param>
         /// <returns>The allocated tensor is returned.</returns>
         /// <exception cref="ArgumentException">Is thrown if a tensor of the given shape can't be created.</exception>
-        public T AllocateTensor<T, K>(int[] shape, ITensorMemoryLayout layout, bool initialize, bool alignment, bool pageAlignment, IEnumerable<K>? values) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateTensor<T, K>(int[] shape, ITensorMemoryLayout layout, bool initialize, bool alignment, bool pageAlignment, IEnumerable<K>? values) where T : ITensor<K> where K : unmanaged;
         
         /// <summary>
         /// Allocates a new tensor with the given layout and shape.
@@ -28,7 +28,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="layout">The layout of the tensor in memory.</param>
         /// <param name="shape">The shape of the tensor.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateTensor<T, K>(ITensorMemoryLayout layout, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateTensor<T, K>(ITensorMemoryLayout layout, params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new aligned tensor with the given layout and shape.
@@ -36,7 +36,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
         /// <param name="shape">The shape of the tensor.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateAlignedTensor<T, K>(params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateAlignedTensor<T, K>(params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new aligned tensor with the given layout and shape.
@@ -45,7 +45,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="layout">The layout of the tensor in memory.</param>
         /// <param name="shape">The shape of the tensor.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateAlignedTensor<T, K>(ITensorMemoryLayout layout, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateAlignedTensor<T, K>(ITensorMemoryLayout layout, params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new tensor with the given layout and shape.
@@ -53,7 +53,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
         /// <param name="shape">The shape of the tensor.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateTensor<T, K>(params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateTensor<T, K>(params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new uninitialized tensor with the given layout and shape.
@@ -62,7 +62,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="layout">The layout of the tensor in memory.</param>
         /// <param name="shape">The shape of the tensor.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedTensor<T, K>(ITensorMemoryLayout layout, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateUninitializedTensor<T, K>(ITensorMemoryLayout layout, params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new uninitialized tensor with the given layout and shape.
@@ -70,16 +70,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
         /// <param name="shape">The shape of the tensor.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedTensor<T, K>(params int[] shape) where T : ITensor<K> where K : INumber<K>;
-
-        /// <summary>
-        /// Allocates a new uninitialized tensor with the given layout and shape.
-        /// </summary>
-        /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
-        /// <param name="shape">The shape of the tensor.</param>
-        /// <param name="values">An enumerable with the values of the tensor in row-major layout.</param>
-        /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedTensor<T, K>(IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateUninitializedTensor<T, K>(params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new uninitialized tensor with the given layout and shape.
@@ -88,7 +79,16 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="shape">The shape of the tensor.</param>
         /// <param name="values">An enumerable with the values of the tensor in row-major layout.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedTensor<T, K>(ITensorMemoryLayout layout, IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateUninitializedTensor<T, K>(IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : unmanaged;
+
+        /// <summary>
+        /// Allocates a new uninitialized tensor with the given layout and shape.
+        /// </summary>
+        /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
+        /// <param name="shape">The shape of the tensor.</param>
+        /// <param name="values">An enumerable with the values of the tensor in row-major layout.</param>
+        /// <returns>The allocated tensor is returned.</returns>
+        public T AllocateUninitializedTensor<T, K>(ITensorMemoryLayout layout, IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : unmanaged;
 
 
         /// <summary>
@@ -98,7 +98,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="layout">The layout of the tensor in memory.</param>
         /// <param name="shape">The shape of the tensor.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedAlignedTensor<T, K>(ITensorMemoryLayout layout, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateUninitializedAlignedTensor<T, K>(ITensorMemoryLayout layout, params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new uninitialized aligned tensor with the given layout and shape.
@@ -106,16 +106,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
         /// <param name="shape">The shape of the tensor.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedAlignedTensor<T, K>(params int[] shape) where T : ITensor<K> where K : INumber<K>;
-
-        /// <summary>
-        /// Allocates a new uninitialized aligned tensor with the given layout and shape.
-        /// </summary>
-        /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
-        /// <param name="shape">The shape of the tensor.</param>
-        /// <param name="values">An enumerable with the values of the tensor in row-major layout.</param>
-        /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedAlignedTensor<T, K>(IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateUninitializedAlignedTensor<T, K>(params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new uninitialized aligned tensor with the given layout and shape.
@@ -124,7 +115,16 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="shape">The shape of the tensor.</param>
         /// <param name="values">An enumerable with the values of the tensor in row-major layout.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedAlignedTensor<T, K>(ITensorMemoryLayout layout, IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateUninitializedAlignedTensor<T, K>(IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : unmanaged;
+
+        /// <summary>
+        /// Allocates a new uninitialized aligned tensor with the given layout and shape.
+        /// </summary>
+        /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
+        /// <param name="shape">The shape of the tensor.</param>
+        /// <param name="values">An enumerable with the values of the tensor in row-major layout.</param>
+        /// <returns>The allocated tensor is returned.</returns>
+        public T AllocateUninitializedAlignedTensor<T, K>(ITensorMemoryLayout layout, IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new uninitialized aligned tensor with the given layout and shape.
@@ -133,7 +133,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="layout">The layout of the tensor in memory.</param>
         /// <param name="shape">The shape of the tensor.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedPageAlignedTensor<T, K>(ITensorMemoryLayout layout, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateUninitializedPageAlignedTensor<T, K>(ITensorMemoryLayout layout, params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new uninitialized aligned tensor with the given layout and shape.
@@ -141,16 +141,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
         /// <param name="shape">The shape of the tensor.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedPageAlignedTensor<T, K>(params int[] shape) where T : ITensor<K> where K : INumber<K>;
-
-        /// <summary>
-        /// Allocates a new uninitialized aligned tensor with the given layout and shape.
-        /// </summary>
-        /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
-        /// <param name="shape">The shape of the tensor.</param>
-        /// <param name="values">An enumerable with the values of the tensor in row-major layout.</param>
-        /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedPageAlignedTensor<T, K>(IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateUninitializedPageAlignedTensor<T, K>(params int[] shape) where T : ITensor<K> where K : unmanaged;
 
         /// <summary>
         /// Allocates a new uninitialized aligned tensor with the given layout and shape.
@@ -159,6 +150,15 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="shape">The shape of the tensor.</param>
         /// <param name="values">An enumerable with the values of the tensor in row-major layout.</param>
         /// <returns>The allocated tensor is returned.</returns>
-        public T AllocateUninitializedPageAlignedTensor<T, K>(ITensorMemoryLayout layout, IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : INumber<K>;
+        public T AllocateUninitializedPageAlignedTensor<T, K>(IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : unmanaged;
+
+        /// <summary>
+        /// Allocates a new uninitialized aligned tensor with the given layout and shape.
+        /// </summary>
+        /// <typeparam name="T">Float or Double dpending on the desired precision.</typeparam>
+        /// <param name="shape">The shape of the tensor.</param>
+        /// <param name="values">An enumerable with the values of the tensor in row-major layout.</param>
+        /// <returns>The allocated tensor is returned.</returns>
+        public T AllocateUninitializedPageAlignedTensor<T, K>(ITensorMemoryLayout layout, IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K : unmanaged;
     }
 }
