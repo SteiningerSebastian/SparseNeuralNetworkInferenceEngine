@@ -60,9 +60,12 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         {
             if(this.accelerator is not null)
             {
-                if(this.accelerator is IAddAligned acc)
+                // Acceleration is only supported for floats
+                if(this.accelerator is IAddAligned acc && typeof(T) == typeof(float))
                 {
-                    await acc.AddAsync(this.data.Data, operand.data.Data);
+                    Span<float> a = MemoryMarshal.Cast<T, float>(data.Data);
+                    Span<float> b = MemoryMarshal.Cast<T, float>(operand.data.Data);
+                    await acc.AddAsync(a, b);
                     return;
                 }
             }

@@ -44,16 +44,16 @@ namespace Meth.Tensor.Tests
         }
 
         [Theory]
-        [InlineData(3)]
-        [InlineData(12)]
-        [InlineData(125)]
-        [InlineData(1254)]
-        [InlineData(46482)]
-        [InlineData(646483)]
+        [InlineData(16)]
+        [InlineData(32)]
+        [InlineData(64)]
+        [InlineData(1024)]
+        [InlineData(16*1024)]
+        [InlineData(16*4096)]
 
         public async Task Add(int n)
         {
-            IThreadPool pool = new SparseNeuralNetworkInferenceEngine.Engine.ThreadPool(8, 1024);
+            IThreadPool pool = new SparseNeuralNetworkInferenceEngine.Engine.ThreadPool(1, 1024);
             IHardwareAccelerator accelerator = new AVXHardwareAccelerator(pool);
 
             IInferenceEngine engine = new InferenceEngine(accelerator);

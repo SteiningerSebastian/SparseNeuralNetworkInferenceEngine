@@ -30,45 +30,76 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             }
         }
 
-        /// <inheritdoc/>
-        public Task AddAsync<T>(Span<T> addend1, Span<T> addend2) where T : unmanaged
+        public object Clone()
         {
-            Debug.Assert(addend1.Length == addend2.Length, "Only spans of same size are supported."); // Can only add elements of same length.
-            Debug.Assert(typeof(T) == typeof(float) || typeof(T) == typeof(double), "Only single or double precision floating point numbers are supported");
+            return new AVXHardwareAccelerator(threadPool);
+        }
 
-            int nVectors = addend1.Length / Vector<T>.Count;
+        /// <inheritdoc/>
+        public Task AddAsync(Span<float> addend1, Span<float> addend2)
+        {
+            // Can only add elements of same length.
+            Debug.Assert(addend1.Length == addend2.Length, "Only spans of same size are supported.");
+            Debug.Assert(addend1.Length % KERNEL_SIZE_IN_FLOATS == 0, "The vectors muust have a length of a multiple of KERNEL_SIZE_IN_FLOATS.");
+
+            int nVectors = addend1.Length / KERNEL_SIZE_IN_FLOATS;
             Task t;
 
             unsafe
             {
-                ref T add1 = ref MemoryMarshal.GetReference(addend1);
-                ref T add2 = ref MemoryMarshal.GetReference(addend2);
+                ref float add1 = ref MemoryMarshal.GetReference(addend1);
+                ref float add2 = ref MemoryMarshal.GetReference(addend2);
 
-                T* ptrAdd1 = (T*)Unsafe.AsPointer(ref add1);
-                T* ptrAdd2 = (T*)Unsafe.AsPointer(ref add2);
+                float* ptrAdd1 = (float*)Unsafe.AsPointer(ref add1);
+                float* ptrAdd2 = (float*)Unsafe.AsPointer(ref add2);
 
-                int partitions = Math.Min(threadPool.NumberOfThreads, nVectors);
-                int vectorsPerPartition = (int)Math.Ceiling(nVectors / (float)partitions);
+                int vectorsPerPartition = nVectors / threadPool.NumberOfThreads;
+                int vectorsRemaining = nVectors % threadPool.NumberOfThreads;
 
-                // Avoiding false sharing, making sure the vectorsPerPartiton is a multiple of 2 (for floats) 256 bit register for AVX256
-                if ((Vector<float>.Count == 8 || Vector<double>.Count == 4) && (vectorsPerPartition & 0b1) != 0)
-                    vectorsPerPartition += 1;
+                int requiredWorkers = vectorsPerPartition == 0 ? vectorsRemaining : threadPool.NumberOfThreads;
 
-                Task[] tasks = new Task[partitions];
+                Task[] tasks = new Task[requiredWorkers];
 
                 int offset = 0;
-                // Add the values
-                for (int i = 0; i < partitions; i += 1)
+                // Add the values with the required workers, each has at least 1 item.
+                for (int i = 0; i < requiredWorkers; i += 1)
                 {
-                    int startOffset = offset;
-                    int endOffset = Math.Min((addend1.Length / Vector<T>.Count) * Vector<T>.Count, offset + vectorsPerPartition * Vector<T>.Count);
+                    int workItems = vectorsPerPartition;
+
+                    // Distribute the remaining work to the first
+                    // few workers. 
+                    if (vectorsRemaining > 0)
+                    {
+                        workItems++;
+                        vectorsRemaining--;
+                    }
+
+                    float* currentAdd1Ptr = ptrAdd1 + offset;
+                    float* currentAdd2Ptr = ptrAdd2 + offset;
+
                     var th = threadPool.Schedule((_) =>
                     {
-                        for (int o = startOffset; o < endOffset; o += Vector<T>.Count)
+                        for (int k = 0; k < workItems; k++)
                         {
-                            var v1 = Vector.LoadAligned(ptrAdd1 + o);
-                            var v2 = Vector.LoadAligned(ptrAdd2 + o);
-                            Vector.Add(v1, v2).StoreAligned(ptrAdd1 + o);
+                            if (Vector<float>.Count == KERNEL_SIZE_IN_FLOATS)
+                            {
+                                var v1 = Vector.LoadAligned(currentAdd1Ptr);
+                                var v2 = Vector.LoadAligned(currentAdd2Ptr);
+                                Vector.Add(v1, v2).StoreAligned(currentAdd1Ptr);
+                            }
+                            else
+                            {
+                                var v1 = Vector.LoadAligned(currentAdd1Ptr);
+                                var v2 = Vector.LoadAligned(currentAdd2Ptr);
+                                Vector.Add(v1, v2).StoreAligned(currentAdd1Ptr);
+
+                                var v3 = Vector.LoadAligned(currentAdd1Ptr + Vector<float>.Count);
+                                var v4 = Vector.LoadAligned(currentAdd2Ptr + Vector<float>.Count);
+                                Vector.Add(v3, v4).StoreAligned(currentAdd1Ptr + Vector<float>.Count);
+                            }
+
+                            currentAdd1Ptr += KERNEL_SIZE_IN_FLOATS;
+                            currentAdd2Ptr += KERNEL_SIZE_IN_FLOATS;
                         }
                     });
 
@@ -77,30 +108,11 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
                     tasks[i] = th;
 
-                    offset += Vector<T>.Count * vectorsPerPartition;
+                    offset += workItems * KERNEL_SIZE_IN_FLOATS;
                 }
 
                 t = Task.WhenAll(tasks);
 
-            }
-
-
-            // for remaining floats, not able to be proccessed with hardware accelerated instructions.
-            for (int i = nVectors * Vector<T>.Count; i < addend1.Length; i++)
-            {
-                if (typeof(T) == typeof(float))
-                {
-                    var a1 = MemoryMarshal.Cast<T, float>(addend1);
-                    var a2 = MemoryMarshal.Cast<T, float>(addend2);
-                    a1[i] += a2[i];
-
-                }
-                else
-                {
-                    var a1 = MemoryMarshal.Cast<T, double>(addend1);
-                    var a2 = MemoryMarshal.Cast<T, double>(addend2);
-                    a1[i] += a2[i];
-                }
             }
 
             return t;
@@ -111,48 +123,77 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
         /// While this function is basically the same as the one above, to avoid branching inside such high performance code
         /// we created this function again with the only difference that Max(0, element) is applied before storing in addend1
         /// </summary>
-        protected Task AddReLUAsync<T>(Span<T> addend1, Span<T> addend2) where T : unmanaged
+        protected Task AddReLUAsync(Span<float> addend1, Span<float> addend2)
         {
-            Debug.Assert(addend1.Length == addend2.Length, "Only spans of same size are supported."); // Can only add elements of same length.
-            Debug.Assert(typeof(T) == typeof(float) || typeof(T) == typeof(double), "Only single or double precision floating point numbers are supported");
+            // Can only add elements of same length.
+            Debug.Assert(addend1.Length == addend2.Length, "Only spans of same size are supported.");
+            Debug.Assert(addend1.Length % KERNEL_SIZE_IN_FLOATS == 0, "The vectors muust have a length of a multiple of KERNEL_SIZE_IN_FLOATS.");
 
-            int nVectors = addend1.Length / Vector<T>.Count;
+            int nVectors = addend1.Length / KERNEL_SIZE_IN_FLOATS;
             Task t;
 
             unsafe
             {
-                ref T add1 = ref MemoryMarshal.GetReference(addend1);
-                ref T add2 = ref MemoryMarshal.GetReference(addend2);
+                ref float add1 = ref MemoryMarshal.GetReference(addend1);
+                ref float add2 = ref MemoryMarshal.GetReference(addend2);
 
-                T* ptrAdd1 = (T*)Unsafe.AsPointer(ref add1);
-                T* ptrAdd2 = (T*)Unsafe.AsPointer(ref add2);
+                float* ptrAdd1 = (float*)Unsafe.AsPointer(ref add1);
+                float* ptrAdd2 = (float*)Unsafe.AsPointer(ref add2);
 
-                int partitions = Math.Min(threadPool.NumberOfThreads, nVectors);
-                int vectorsPerPartition = (int)Math.Ceiling(nVectors / (float)partitions);
+                int vectorsPerPartition = nVectors / threadPool.NumberOfThreads;
+                int vectorsRemaining = nVectors % threadPool.NumberOfThreads;
 
-                // Avoiding false sharing, making sure the vectorsPerPartiton is a multiple of 2 (for floats) 256 bit register for AVX256
-                if ((Vector<float>.Count == 8 || Vector<double>.Count == 4) && (vectorsPerPartition & 0b1) != 0)
-                    vectorsPerPartition += 1;
+                int requiredWorkers = vectorsPerPartition == 0 ? vectorsRemaining : threadPool.NumberOfThreads;
 
-                Task[] tasks = new Task[partitions];
+                Task[] tasks = new Task[requiredWorkers];
 
                 int offset = 0;
-                // Add the values
-                for (int i = 0; i < partitions; i += 1)
+                // Add the values with the required workers, each has at least 1 item.
+                for (int i = 0; i < requiredWorkers; i += 1)
                 {
-                    int startOffset = offset;
-                    int endOffset = Math.Min((addend1.Length / Vector<T>.Count) * Vector<T>.Count, offset + vectorsPerPartition * Vector<T>.Count);
+                    int workItems = vectorsPerPartition;
+
+                    // Distribute the remaining work to the first
+                    // few workers. 
+                    if (vectorsRemaining > 0)
+                    {
+                        workItems++;
+                        vectorsRemaining--;
+                    }
+
+                    float* currentAdd1Ptr = ptrAdd1 + offset;
+                    float* currentAdd2Ptr = ptrAdd2 + offset;
+
                     var th = threadPool.Schedule((_) =>
                     {
-                        var zeros = Vector.Create<T>(default(T)); // Default for float, double is zero
-                        for (int o = startOffset; o < endOffset; o += Vector<T>.Count)
+                        var zeros = Vector.Create<float>(0);
+                        for (int k = 0; k < workItems; k++)
                         {
-                            var v1 = Vector.LoadAligned(ptrAdd1 + o);
-                            var v2 = Vector.LoadAligned(ptrAdd2 + o);
-                            var res = Vector.Add(v1, v2);
-                            // Apply relu to result.
-                            res = Vector.Max(zeros, res);
-                            res.StoreAligned(ptrAdd1 + o);
+                            if (Vector<float>.Count == KERNEL_SIZE_IN_FLOATS)
+                            {
+                                var v1 = Vector.LoadAligned(currentAdd1Ptr);
+                                var v2 = Vector.LoadAligned(currentAdd2Ptr);
+                                var res = Vector.Add(v1, v2);
+                                res = Vector.Max(res, zeros);
+                                res.StoreAligned(currentAdd1Ptr);
+                            }
+                            else
+                            {
+                                var v1 = Vector.LoadAligned(currentAdd1Ptr);
+                                var v2 = Vector.LoadAligned(currentAdd2Ptr);
+                                var res1 = Vector.Add(v1, v2);
+                                res1 = Vector.Max(res1, zeros);
+                                res1.StoreAligned(currentAdd1Ptr);
+
+                                var v3 = Vector.LoadAligned(currentAdd1Ptr + Vector<float>.Count);
+                                var v4 = Vector.LoadAligned(currentAdd2Ptr + Vector<float>.Count);
+                                var res2 = Vector.Add(v3, v4);
+                                res2 = Vector.Max(res2, zeros);
+                                res2.StoreAligned(currentAdd1Ptr + Vector<float>.Count);
+                            }
+
+                            currentAdd1Ptr += KERNEL_SIZE_IN_FLOATS;
+                            currentAdd2Ptr += KERNEL_SIZE_IN_FLOATS;
                         }
                     });
 
@@ -161,41 +202,19 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
                     tasks[i] = th;
 
-                    offset += Vector<T>.Count * vectorsPerPartition;
+                    offset += workItems * KERNEL_SIZE_IN_FLOATS;
                 }
 
                 t = Task.WhenAll(tasks);
 
             }
 
-
-            // for remaining floats, not able to be proccessed with hardware accelerated instructions.
-            for (int i = nVectors * Vector<T>.Count; i < addend1.Length; i++)
-            {
-                if (typeof(T) == typeof(float))
-                {
-                    var a1 = MemoryMarshal.Cast<T, float>(addend1);
-                    var a2 = MemoryMarshal.Cast<T, float>(addend2);
-                    a1[i] += a2[i];
-
-                }
-                else
-                {
-                    var a1 = MemoryMarshal.Cast<T, double>(addend1);
-                    var a2 = MemoryMarshal.Cast<T, double>(addend2);
-                    a1[i] += a2[i];
-                }
-            }
-
             return t;
         }
 
-        public object Clone()
-        {
-            return new AVXHardwareAccelerator(threadPool);
-        }
 
         const int KERNEL_SIZE_IN_FLOATS = (Settings.KERNEL_SIZE / sizeof(float));
+
 
         /// <summary>
         /// Copies the batch to the activations.
@@ -211,80 +230,80 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
         /// <returns>A task that completes when all events complete.</returns>
         /// <exception cref="HardwareAccelerationException"></exception>
 
-        protected unsafe Task CopyBiasToActivations(int batches, int hKernels, int elementsInVector, float* ptrBias, float* ptrActivations, CancellationToken ct = default)
+        protected unsafe Task CopyBiasToActivations(int batches, int hKernels, float* ptrBias, float* ptrActivations, CancellationToken ct = default)
         {
             List<Task> tasks = new();
 
-            if (batches * hKernels * Vector<float>.Count < Settings.SINGEL_THREAD_OPERATION_THRESHOLD)
-            {
-                // Copy the bais to the activations
-                for (int c = 0; c < hKernels; c++)
-                {
+            // Distribute the work evenly 
 
-                    int co = c;
-                    Vector<float> vecBias = Vector.LoadAligned(ptrBias + co * elementsInVector);
-                    for (int b = 0; b < batches; b++)
-                    {
-                        Vector.Store(vecBias, ptrActivations + batches * elementsInVector + co * (batches * elementsInVector));
-                    }
+            int hKernelsPerThread = hKernels / threadPool.NumberOfThreads;
+            int hKernelsRemaing = hKernels % threadPool.NumberOfThreads;
+
+            int requiredWorkers = hKernelsPerThread == 0 ? hKernelsRemaing : threadPool.NumberOfThreads;
+
+            int offsetBias = 0;
+            int offsetActivations = 0;
+            // Copy the bais to the activations
+            for (int c = 0; c < requiredWorkers; c++)
+            {
+                int hKernelsInTask = hKernelsPerThread;
+                if (hKernelsRemaing > 0)
+                {
+                    hKernelsInTask++;
+                    hKernelsRemaing--;
                 }
-            }
-            else
-            {
-                int hKernelsPerThread = (int)Math.Ceiling(hKernels / (float)threadPool.NumberOfThreads);
 
-                // Copy the bais to the activations
-                for (int c = 0; c < hKernels; c += hKernelsPerThread)
+                float* currentBiasPtr = ptrBias + offsetBias;
+                float* currentActivationPtr = ptrActivations + offsetActivations;
+                var t = threadPool.Schedule((i) =>
                 {
-                    int co = c;
-                    int end = Math.Min(hKernels, co + hKernelsPerThread);
-                    float* currentBiasPtr = ptrBias;
-                    float* currentActivationPtr = ptrActivations;
-                    var t = threadPool.Schedule((i) =>
-                    {
 
-                        for (int cio = co; cio < end; cio++)
+                    for (int k = 0; k < hKernelsInTask; k++)
+                    {
+                        // If 8 floats / 512bit are supported we can do this in a single instruction. If the machine does not support 512 bit but 256bit
+                        // do two instructions unroled.
+                        if (Vector<float>.Count == KERNEL_SIZE_IN_FLOATS)
                         {
-                            // If 8 floats / 512bit are supported we can do this in a single instruction. If the machine does not support 512 bit but 256bit
-                            // do two instructions unroled.
-                            if (Vector<float>.Count == KERNEL_SIZE_IN_FLOATS)
+                            Vector<float> vecBias = Vector.LoadAligned(currentBiasPtr);
+                            for (int b = 0; b < batches; b++)
                             {
-                                Vector<float> vecBias = Vector.LoadAligned(currentBiasPtr);
-                                for (int b = 0; b < batches; b++)
-                                {
-                                    Vector.Store(vecBias, currentActivationPtr);
-                                    currentActivationPtr += elementsInVector;
-                                }
-                                currentBiasPtr += elementsInVector;
+                                Vector.Store(vecBias, currentActivationPtr);
+                                currentActivationPtr += KERNEL_SIZE_IN_FLOATS;
                             }
-                            else
-                            {
-                                Vector<float> vecBias1 = Vector.LoadAligned(currentBiasPtr);
-                                Vector<float> vecBias2 = Vector.LoadAligned(currentBiasPtr + Vector<float>.Count);
-
-                                for (int b = 0; b < batches; b++)
-                                {
-                                    Vector.Store(vecBias1, currentActivationPtr);
-                                    Vector.Store(vecBias2, currentActivationPtr + Vector<float>.Count);
-
-                                    currentActivationPtr += elementsInVector;
-                                }
-                                currentBiasPtr += elementsInVector;
-                            }
+                            currentBiasPtr += KERNEL_SIZE_IN_FLOATS;
                         }
-                    });
+                        else
+                        {
+                            Vector<float> vecBias1 = Vector.LoadAligned(currentBiasPtr);
+                            Vector<float> vecBias2 = Vector.LoadAligned(currentBiasPtr + Vector<float>.Count);
 
-                    if (t is null)
-                    {
-                        throw new HardwareAccelerationException("Unable to schedule calculation.");
+                            for (int b = 0; b < batches; b++)
+                            {
+                                Vector.Store(vecBias1, currentActivationPtr);
+                                Vector.Store(vecBias2, currentActivationPtr + Vector<float>.Count);
+
+                                currentActivationPtr += KERNEL_SIZE_IN_FLOATS;
+                            }
+                            currentBiasPtr += KERNEL_SIZE_IN_FLOATS;
+                        }
                     }
+                });
 
-                    tasks.Add(t);
+                if (t is null)
+                {
+                    throw new HardwareAccelerationException("Unable to schedule calculation.");
                 }
+
+                tasks.Add(t);
+
+                offsetBias += KERNEL_SIZE_IN_FLOATS * hKernelsInTask;
+                offsetActivations += KERNEL_SIZE_IN_FLOATS * hKernelsInTask * batches;
             }
+
 
             return Task.WhenAll(tasks);
         }
+
 
         /// <inheritdoc/>
         public Task FusedMultiplyAddReLU(int batches, int[] weightsShape, Span<float> inputs, Span<float> weights, Span<float> bias, NativeMemoryOwner<float> activations, CancellationToken ct = default)
@@ -317,19 +336,28 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 int elementsInVector = Vector<float>.Count;
 
                 // Initializing the result tensor with the bias.
-                var copyBiasTask = CopyBiasToActivations(batches, hKernels, elementsInVector, ptrBias, ptrActivations, ct);
+                var copyBiasTask = CopyBiasToActivations(batches, hKernels, ptrBias, ptrActivations, ct);
 
                 tasks.Add(copyBiasTask);
 
-                int partitions = Math.Min(threadPool.NumberOfThreads, vKernels);
-                int vKernelsPerPartition = (int)Math.Ceiling(vKernels / (float)partitions);
+                // Distribute the work evenly 
+                int vKernelsPerPartition = vKernels / threadPool.NumberOfThreads;
+                int vKernelsRemaining = vKernels % threadPool.NumberOfThreads;
 
-                int offset = 0;
+                int partitions = vKernelsPerPartition == 0 ? vKernelsRemaining : threadPool.NumberOfThreads;
+
+                int offsetWeights = 0;
+                int offsetInputs = 0;
+
                 // For each partition produce the intermediary result of x*W
                 for (int i = 0; i < partitions; i += 1)
                 {
-                    int startOffset = offset;
-                    int endOffset = offset + vKernelsPerPartition * hKernels * KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
+                    var vHeightInPartition = vKernelsPerPartition;
+                    if (vKernelsRemaining > 0)
+                    {
+                        vHeightInPartition++;
+                        vKernelsRemaining--;
+                    }
 
                     // Buffer for the thread to work with.
                     var buffer = bufferManager.GetBuffer(activations.Data.Length, sizeof(float));
@@ -341,8 +369,8 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                     float* ptrBuffer = (float*)Unsafe.AsPointer(ref rBuffer);
 
                     // Calculate the pointers this work-item needs.
-                    float* currentWeightsPtr = ptrWeights + offset;
-                    float* currentInputsPtr = ptrInputs;
+                    float* currentWeightsPtr = ptrWeights + offsetWeights;
+                    float* currentInputsPtr = ptrInputs + offsetInputs;
                     float* currentBufferPtr = ptrBuffer;
 
                     var th = threadPool.Schedule((_) =>
@@ -350,19 +378,31 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         buffer.Clear(); // For performance reason the buffer is created uninitialized, so clear it.
                         var zeros = Vector.Create<float>(0);
 
+                        float* coloumnStartInputsPtr = currentInputsPtr;
+
                         for (int c = 0; c < hKernels; c++)
                         {
+                            float* coloumnStartBufferPtr = currentBufferPtr;
+                            currentInputsPtr = coloumnStartInputsPtr;
+
                             // The amount of rows we need to compute before moving on the the next coloumn
-                            for (int r = 0; r < vKernelsPerPartition; r += 1)
+                            for (int r = 0; r < vHeightInPartition; r += 1)
                             {
+                                // these rows are in the same part of the buffer
+                                currentBufferPtr = coloumnStartBufferPtr;
+
                                 float* kernelStartWeightsPtr = currentWeightsPtr;
-                                float* kernelStartInputsPtr = currentInputsPtr;
+
                                 // This kernel for every batch to keep weights in cahce
                                 for (int b = 0; b < batches; b++)
                                 {
+                                    // For the batch start at the beginning of the weights (weights and inputs)
+                                    currentWeightsPtr = kernelStartWeightsPtr;
+
                                     if (Vector<float>.Count == KERNEL_SIZE_IN_FLOATS)
                                     {
                                         var vcInputs = Vector.LoadAligned(currentInputsPtr);
+
                                         // Check if whole kernel is zero => skip sparse activations.
                                         if (Vector.EqualsAll(zeros, vcInputs))
                                             continue;
@@ -373,13 +413,13 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                         {
                                             Vector<float> vecWeights = Vector.LoadAligned(currentWeightsPtr);
 
-                                            float x = *ptrInputs; // Load the input from inputs
+                                            float x = *currentInputsPtr; // Load the input from inputs
                                             addents = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights, addents);
 
                                             // move the weigths point to next line.
-                                            currentWeightsPtr += elementsInVector;
+                                            currentWeightsPtr += KERNEL_SIZE_IN_FLOATS;
 
-                                            ptrInputs += 1; // Increas inputs pointer for next line
+                                            currentInputsPtr += 1; // Increas inputs pointer for next line
                                         }
 
                                         Vector.Store(addents, currentBufferPtr); // Store the result back in the buffer.
@@ -389,6 +429,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                     {
                                         var vcInputs1 = Vector.LoadAligned(currentInputsPtr);
                                         var vcInputs2 = Vector.LoadAligned(currentInputsPtr + Vector<float>.Count);
+
                                         // Check if whole kernel is zero => skip sparse activations.
                                         if (Vector.EqualsAll(zeros, vcInputs1) && Vector.EqualsAll(zeros, vcInputs2))
                                             continue;
@@ -401,31 +442,24 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                             Vector<float> vecWeights1 = Vector.LoadAligned(currentWeightsPtr);
                                             Vector<float> vecWeights2 = Vector.LoadAligned(currentWeightsPtr + Vector<float>.Count);
 
-                                            float x = *ptrInputs; // Load the input from inputs
+                                            float x = *currentInputsPtr; // Load the input from inputs
                                             addents1 = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights1, addents1);
                                             addents2 = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights2, addents2);
 
                                             // move the weigths point to next line.
-                                            currentWeightsPtr += elementsInVector;
+                                            currentWeightsPtr += KERNEL_SIZE_IN_FLOATS;
 
-                                            ptrInputs += 1; // Increas inputs pointer for next line
+                                            currentInputsPtr += 1; // Increas inputs pointer for next line
                                         }
 
                                         Vector.Store(addents1, currentBufferPtr); // Store the result back in the buffer.
                                         Vector.Store(addents2, currentBufferPtr + Vector<float>.Count); // Store the result back in the buffer.
                                     }
-                                    // For the next batch start at the beginning again (weights and inputs)
-                                    currentWeightsPtr = kernelStartWeightsPtr;
-                                    currentInputsPtr = kernelStartInputsPtr;
-                                    
+
                                     // Move the buffer we work on.
-                                    currentBufferPtr += elementsInVector; 
+                                    currentBufferPtr += KERNEL_SIZE_IN_FLOATS;
                                 }
                             }
-                            // Move to the next coloumn kernel wise in buffer.
-                            currentBufferPtr += elementsInVector;
-                            // Move on the nex inputs.
-                            ptrInputs += elementsInVector;
                         }
                     });
 
@@ -434,7 +468,8 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
                     tasks.Add(th);
 
-                    offset = endOffset;
+                    offsetWeights += vHeightInPartition * hKernels * KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
+                    offsetInputs += vHeightInPartition * KERNEL_SIZE_IN_FLOATS * batches;
                 }
             }
 
@@ -442,32 +477,29 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             task = Task.WhenAll(tasks);
             for (int i = 1; i < activationResults.Count; i++)
             {
-                task = task.ContinueWith(async (_) =>
+                int j = i;
+                task = task.ContinueWith((_) =>
                 {
-                    var t = AddAsync<float>(activationResults[0].Buffer, activationResults[i].Buffer);
+                    var t = AddAsync(activationResults[0].Buffer, activationResults[j].Buffer);
 
                     if (t is null)
                         throw new HardwareAccelerationException("Unable to perform operation, work-queue overflow");
 
-                    await t;
-
-                    activationResults[i].Dispose(); // Don't need the buffer anymore so dispose.
-                });
+                    return t.ContinueWith((_)=> { activationResults[j].Dispose(); });// Don't need the buffer anymore so dispose.
+                }).Unwrap();
             }
 
             // Now add them to the result (where the bias is already there)
-            task = task.ContinueWith(async (_) =>
+            task = task.ContinueWith((_) =>
             {
                 // here we add the buffers to the activations data and apply the relu function to it. max(0, x)
-                var t = AddReLUAsync<float>(activations.Data, activationResults[0].Buffer);
+                var t = AddReLUAsync(activations.Data, activationResults[0].Buffer);
 
-                if (t is null)
+                if (t is null)  
                     throw new HardwareAccelerationException("Unable to perform operation, work-queue overflow");
 
-                await t;
-
-                activationResults[0].Dispose(); //Don't need this buffer anymore so dispose.
-            });
+                return t.ContinueWith((_) => { activationResults[0].Dispose(); }); //Don't need this buffer anymore so dispose.
+            }).Unwrap();
 
             return task;
         }

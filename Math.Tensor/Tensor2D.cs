@@ -40,12 +40,12 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// <param name="weights">The weights tensor stored in WeightTensorMemoryLayout.</param>
         /// <param name="bias">The bias tensor stored in the BatchValueTensorLayout.</param>
         /// <param name="result">The result, a tensor stored in the BatchValueTensorLayout.</param>
-        public void SparseFusedMultiplyAdd(Tensor2D<float> weights, Tensor1D<float> bias, Tensor2D<float> result) {
+        public async Task SparseFusedMultiplyAdd(Tensor2D<float> weights, Tensor1D<float> bias, Tensor2D<float> result) {
             if (typeof(T) != typeof(float))
                 throw new NotImplementedException("Sparse Fused Multiply Add is only supported with single precision floating point numbers.");
 
             // Making sure the layout of the Tensor matches the supported layout for the tensors
-            Debug.Assert(weights.LayoutMapper.GetType() ==  typeof(WeightsTensorMemoryMapper), "Expected WeightsTensorMemoryMapper for weight tensor.");
+            Debug.Assert(weights.LayoutMapper.GetType() ==  typeof(WeightsTensorMemoryLayout), "Expected WeightsTensorMemoryMapper for weight tensor.");
             Debug.Assert(bias.LayoutMapper.GetType() == typeof(RowMajorTensorMemoryLayout), "Expected RowMajorTensorMemoryLayout for bais tensor.");
             Debug.Assert(result.LayoutMapper.GetType() == typeof(BatchValueTensorMemoryLayout), "Expected BatchValueTensorMemoryMapper for result tensor.");
 
@@ -61,7 +61,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             {
                 Span<float> inputs = MemoryMarshal.Cast<T, float>(data.Data);
 
-                acc.FusedMultiplyAddReLU(shape[0], weights.shape, inputs, weights.data.Data, bias.GetValues(), result.data);
+                await acc.FusedMultiplyAddReLU(shape[0], weights.shape, inputs, weights.data.Data, bias.GetValues(), result.data);
                 return;
             }
 

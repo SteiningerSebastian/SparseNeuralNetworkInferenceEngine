@@ -2,7 +2,8 @@
 using System.Collections;
 using System.Diagnostics;
 using System.Numerics;
-
+using System.Runtime.CompilerServices;
+[assembly: InternalsVisibleTo("SparseNeuralNetworkInferenceEngine.Math.Tensor.Tests")]
 namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 {
     public abstract class Tensor<T> : ICloneable, IEnumerable<T>, ITensor<T> where T : unmanaged
@@ -21,6 +22,11 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// The alligned memory to be used to store the tensor.
         /// </summary>
         protected NativeMemoryOwner<T> data;
+
+        /// <summary>
+        /// Returns the data inside the tensor.
+        /// </summary>
+        public Span<T> Data => data.Data;
 
         /// <summary>
         /// The HardwareAccelerator to use.
