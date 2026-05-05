@@ -201,6 +201,36 @@ namespace Meth.Tensor.Tests
             Assert.True(restoredValues.SequenceEqual(values));
         }
 
+
+        [Theory]
+        [InlineData(4, 32, 16, 1)]
+        [InlineData(64, 256, 128, 1)]
+        [InlineData(1024, 128, 1024, 1)]
+        [InlineData(4, 32, 16, 2)]
+        [InlineData(1, 48, 32, 2)]
+        [InlineData(16, 32, 64, 2)]
+        [InlineData(16, 128, 64, 7)]
+        [InlineData(64, 32, 256, 8)]
+        [InlineData(256, 2048, 1024, 8)]
+        [InlineData(64, 4096, 512, 12)]
+        public async Task TestWithoutValidationSparseFusedMultiplyAdd(int batchSize, int d1, int d2, int threads)
+        {
+            ThreadPool pool = new ThreadPool(threads, 1024);
+            AVXHardwareAccelerator accelerator = new AVXHardwareAccelerator(pool);
+            InferenceEngine engine = new InferenceEngine(accelerator);
+
+            var weightsLayout = new WeightsTensorMemoryLayout([d1, d2], threads);
+            var weights = engine.AllocateUninitializedPageAlignedTensor<Tensor2D<float>, float>(weightsLayout, d1, d2);
+
+            var batchValueLayout = new BatchValueTensorMemoryLayout([batchSize, d1]);
+            var inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d1);
+            var bias = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>(d2);
+
+            var outputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d2);
+
+            await inputs.SparseFusedMultiplyAdd(weights, bias, outputs);
+        }
+
         [Theory]
         [InlineData(4, 16, 1)]
         [InlineData(64, 128, 1)]
@@ -212,7 +242,7 @@ namespace Meth.Tensor.Tests
         [InlineData(64, 256, 8)]
         [InlineData(256, 1024, 8)]
         [InlineData(64, 1024, 12)]
-        public async Task TestSquareWeightsSparseFusedMultiplyAdd(int batchSize, int d1, int threads)
+        public async Task TestSquareIdentityWeightsSparseFusedMultiplyAdd(int batchSize, int d1, int threads)
         {
             ThreadPool pool = new ThreadPool(threads, 1024);
             AVXHardwareAccelerator accelerator = new AVXHardwareAccelerator(pool);
@@ -240,7 +270,7 @@ namespace Meth.Tensor.Tests
 
                 for (int b = 0; b < batchSize; b++)
                 {
-                    inputs[b, i] = Random.Shared.Next(0,1000);
+                    inputs[b, i] = Random.Shared.Next(0, 1000);
                 }
             }
 
@@ -255,9 +285,9 @@ namespace Meth.Tensor.Tests
             {
                 for (int b = 0; b < batchSize; b++)
                 {
-                    if(i != outputs[b, i])
+                    if (i != outputs[b, i])
                     {
-                        Debug.Print($"Something went wrong at [{b},{i}]. MemoryOffset: {batchValueLayout.MapToMemory([b,i])}");
+                        Debug.Print($"Something went wrong at [{b},{i}]. MemoryOffset: {batchValueLayout.MapToMemory([b, i])}");
                     }
 
                     Assert.Equal(inputs[b, i] + bias[i], outputs[b, i], precision: 5);

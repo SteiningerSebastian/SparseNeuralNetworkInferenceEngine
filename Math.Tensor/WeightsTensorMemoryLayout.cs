@@ -67,10 +67,11 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
                 // not everything in larger partitions / skip large partioons
                 rowThreadOffset = vKernelsRemaining * (vKernelsPerThread + 1) * KERNEL_SIZE_IN_FLOATS;
                 threadOffset = vKernelsRemaining * hKernels * (vKernelsPerThread + 1) * FLOATS_PER_KERNEL;
-                int threadId = vKernelsRemaining + kernelOffsetRemaining / (vKernelsPerThread);
+                int threadId = kernelOffsetRemaining / (vKernelsPerThread);
                 threadOffset += threadId * hKernels * vKernelsPerThread * FLOATS_PER_KERNEL;
                 vKernelsInThread = vKernelsPerThread;
                 rowThreadOffset += threadId * vKernelsPerThread * KERNEL_SIZE_IN_FLOATS;
+                threadId += vKernelsRemaining;
             }
 
             // Caclulate row countd from where the thread starts
