@@ -14,7 +14,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
     /// Holds the native memory for the tensors.
     /// </summary>
     /// <typeparam name="T">The type to store.</typeparam>
-    public unsafe class NativeMemoryOwner<T> : MemoryManager<T>
+    public unsafe class NativeMemoryOwner<T> : MemoryManager<T>, ICloneable
     {
         private readonly void* pointer;
         private readonly nuint length;
@@ -49,7 +49,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
             this.pointer = NativeMemory.AlignedAlloc(length * typeSize, alignment);
         }
 
-        public NativeMemoryOwner(void* pointer, nuint length, nuint typeSize, nuint alignment, bool disposed)
+        public NativeMemoryOwner(void* pointer, nuint length, nuint typeSize, nuint alignment, ref bool disposed)
         {
             this.pointer = pointer;
             this.length = length;
@@ -99,6 +99,11 @@ namespace SparseNeuralNetworkInferenceEngine.General
             tData.CopyTo(oData); // Copy values over.
 
             return owner;
+        }
+
+        public object Clone()
+        {
+            return new NativeMemoryOwner<T>(pointer, length, typeSize, alignment, ref disposed);
         }
     }
 }

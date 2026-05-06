@@ -21,6 +21,9 @@
   <Project Path="SparseNeuralNetworkInferenceEngine.HardwareAcceleration/SparseNeuralNetworkInferenceEngine.HardwareAcceleration.csproj" Id="17546d06-f783-48cb-8de8-8783ec664835">
     <Platform Solution="*|x64" Project="x64" />
   </Project>
+  <Project Path="SparseNeuralNetworkInferenceEngine.Math/SparseNeuralNetworkInferenceEngine.Math.csproj" Id="8d38e616-5fdd-486b-8490-1bd13cfce02d" />
+  <Project Path="SparseNeuralNetworkInferenceEngine.Model.Tests/SparseNeuralNetworkInferenceEngine.Model.Tests.csproj" Id="bb4f07a7-1e2c-4386-92a2-689048581801" />
+  <Project Path="SparseNeuralNetworkInferenceEngine.Model/SparseNeuralNetworkInferenceEngine.Model.csproj" Id="b8a2e4af-8325-49aa-bfff-60e7382df6d3" />
   <Project Path="SparseNeuralNetworkInferenceEngine/SparseNeuralNetworkInferenceEngine.csproj">
     <Platform Solution="*|x64" Project="x64" />
   </Project>

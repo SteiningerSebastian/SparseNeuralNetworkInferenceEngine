@@ -89,6 +89,23 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             }
         }
 
+        /// <inheritdoc/>
+        public override Tensor<T> DynamicCast(int[] shape)
+        {
+            Debug.Assert(shape.Length == 1, $"Operation not supported for tensor of shape ({string.Join(',', shape)}).");
+            Debug.Assert(shape[0] < this.Shape[0], "May only dynamically cast tensor into smaller tensor");
+
+            if(LayoutMapper.GetType() == typeof(RowMajorTensorMemoryLayout))
+            {
+                var o = (Tensor1D<T>)this.Clone();
+                // We just decrease the size of the tensor but not the memory.
+                o.Length = shape[0];
+                return o;
+            }
+
+            throw new NotImplementedException();
+        }
+
         public Span<T> GetValues() => data.Data;
     }
 }

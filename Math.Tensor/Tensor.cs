@@ -220,6 +220,24 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             }
         }
 
+        /// <summary>
+        /// Tries to dynamically cast the given tensor to a new shape without
+        /// reallocating memoyr.
+        /// </summary>
+        /// <param name="shape">the desired shape of the tensor.</param>
+        /// <returns>A tensor with the new shape but same memory is returned.</returns>
+        public abstract Tensor<T> DynamicCast(int[] shape);
+
+        /// <summary>
+        /// Apply the function to the tensor.
+        /// </summary>
+        /// <param name="function">The function to apply.</param>
+        /// <returns>Returns a task theat finishes when the function is applied.</returns>
+        public async virtual Task ApplyFunction(Func<IEnumerable<T>, IEnumerable<T>> function)
+        {
+            this.PopulateWithEnumerable(function(this)); // Apply function to each element.
+        }
+
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();

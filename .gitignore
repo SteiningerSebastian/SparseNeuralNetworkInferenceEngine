@@ -32,3 +32,9 @@
 /SparseNeuralNetworkInferenceEngine.HardwareAcceleration/bin/x64/Debug/net10.0
 /SparseNeuralNetworkInferenceEninge.Engine.Tests/bin/x64/Debug/net10.0
 /Math.Tensor/bin/x64/Debug/net10.0
+/SparseNeuralNetworkInferenceEngine.Math/bin/Debug/net10.0
+/SparseNeuralNetworkInferenceEngine.Math/obj
+/SparseNeuralNetworkInferenceEngine.Model/bin/Debug/net10.0
+/SparseNeuralNetworkInferenceEngine.Model/obj
+/SparseNeuralNetworkInferenceEngine.Model.Tests/bin/Debug/net10.0
+/SparseNeuralNetworkInferenceEngine.Model.Tests/obj

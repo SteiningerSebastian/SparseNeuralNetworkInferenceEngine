@@ -306,7 +306,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
 
         /// <inheritdoc/>
-        public Task FusedMultiplyAddReLU(int batches, int[] weightsShape, Span<float> inputs, Span<float> weights, Span<float> bias, NativeMemoryOwner<float> activations, CancellationToken ct = default)
+        public Task FusedMultiplyAdd(int batches, int[] weightsShape, Span<float> inputs, Span<float> weights, Span<float> bias, NativeMemoryOwner<float> activations, bool applyReLU = true, CancellationToken ct = default)
         {
             Debug.Assert(inputs.Length % 16 == 0 && weights.Length % 16 == 0 && bias.Length % 16 == 0, "The shape of the tensors must be divisible by 16");
             // Making sure we can actually do the calculation and it doesn't crash on machines that don't support AVX512 but 256 bit register.
@@ -485,7 +485,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                     if (t is null)
                         throw new HardwareAccelerationException("Unable to perform operation, work-queue overflow");
 
-                    return t.ContinueWith((_)=> { activationResults[j].Dispose(); });// Don't need the buffer anymore so dispose.
+                    return t.ContinueWith((_) => { activationResults[j].Dispose(); });// Don't need the buffer anymore so dispose.
                 }).Unwrap();
             }
 
@@ -493,9 +493,9 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             task = task.ContinueWith((_) =>
             {
                 // here we add the buffers to the activations data and apply the relu function to it. max(0, x)
-                var t = AddReLUAsync(activations.Data, activationResults[0].Buffer);
+                var t = applyReLU ? AddReLUAsync(activations.Data, activationResults[0].Buffer) : AddAsync(activations.Data, activationResults[0].Buffer);
 
-                if (t is null)  
+                if (t is null)
                     throw new HardwareAccelerationException("Unable to perform operation, work-queue overflow");
 
                 return t.ContinueWith((_) => { activationResults[0].Dispose(); }); //Don't need this buffer anymore so dispose.
