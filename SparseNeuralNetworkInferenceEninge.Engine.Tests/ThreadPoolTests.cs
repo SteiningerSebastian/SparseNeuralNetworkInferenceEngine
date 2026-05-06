@@ -12,11 +12,11 @@ namespace SparseNeuralNetworkInferenceEninge.Engine.Tests
         {
             CancellationTokenSource cts = new CancellationTokenSource(1000);
 
-            IThreadPool threadPool = new ThreadPool(4, 100, ThreadPriority.Normal, cts.Token);
+            IThreadPool threadPool = new ThreadPool(4, 100, ThreadPriority.Normal, cts);
 
             bool worked = false;
 
-            var task = threadPool.Schedule((i) => { worked = true; return true; });
+            var task = threadPool.Schedule((i, ct) => { worked = true; return true; });
 
             Assert.True(task != null);
             Assert.True(await task);
@@ -28,9 +28,9 @@ namespace SparseNeuralNetworkInferenceEninge.Engine.Tests
         {
             CancellationTokenSource cts = new CancellationTokenSource(1000);
 
-            IThreadPool threadPool = new ThreadPool(4, 100, ThreadPriority.BelowNormal, cts.Token);
+            IThreadPool threadPool = new ThreadPool(4, 100, ThreadPriority.BelowNormal, cts);
             ThreadPriority setPriority = ThreadPriority.Normal;
-            var task = threadPool.Schedule((i) =>
+            var task = threadPool.Schedule((i, ct) =>
             {
                 setPriority = Thread.CurrentThread.Priority;
                 return true;
@@ -48,7 +48,7 @@ namespace SparseNeuralNetworkInferenceEninge.Engine.Tests
         {
             CancellationTokenSource cts = new CancellationTokenSource(3000);
 
-            IThreadPool threadPool = new ThreadPool(4, 10, ThreadPriority.Normal, cts.Token);
+            IThreadPool threadPool = new ThreadPool(4, 10, ThreadPriority.Normal, cts);
 
             ConcurrentBag<int> threadsWorked = new();
 
@@ -57,7 +57,7 @@ namespace SparseNeuralNetworkInferenceEninge.Engine.Tests
             for (int i = 0; i < 10; i++)
             {
                 // Ignore the task that returns the result.
-                var t = threadPool.Schedule<bool>((i) =>
+                var t = threadPool.Schedule<bool>((i, ct) =>
                  {
                      threadsWorked.Add(i);
                      Thread.Sleep(1000); 
@@ -83,7 +83,7 @@ namespace SparseNeuralNetworkInferenceEninge.Engine.Tests
         {
             CancellationTokenSource cts = new CancellationTokenSource(3000);
 
-            IThreadPool threadPool = new ThreadPool(4, 100, ThreadPriority.Normal, cts.Token);
+            IThreadPool threadPool = new ThreadPool(4, 100, ThreadPriority.Normal, cts);
 
             ConcurrentBag<int> threadsWorked = new();
             ConcurrentBag<int> tasksWorked = new();
@@ -96,7 +96,7 @@ namespace SparseNeuralNetworkInferenceEninge.Engine.Tests
                 int d = i;
 
                 // Ignore the task that returns the result.
-                var t = threadPool.Schedule<bool>((n) =>
+                var t = threadPool.Schedule<bool>((n, ct) =>
                 {
                     threadsWorked.Add(n);
                     tasksWorked.Add(d);

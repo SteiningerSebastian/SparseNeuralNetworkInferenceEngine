@@ -202,6 +202,137 @@ namespace Meth.Tensor.Tests
         }
 
 
+        /// <summary>
+        /// Reference implementation for multiply add with relu
+        /// </summary>
+        /// <param name="input"></param>
+        /// <param name="weights"></param>
+        /// <param name="bias"></param>
+        /// <returns></returns>
+        protected float[] MultiplyAddReLU(float[] input, float[,] weights, float[] bias)
+        {
+            float[] result = new float[bias.Length];
+
+            // Copy bias to result 
+            for (int i = 0; i < result.Length; i++)
+            {
+                result[i] = bias[i];
+            }
+
+
+            // Matrix Multiplication
+            for (int i = 0; i < result.Length; i++)
+            {
+                for (int j = 0; j < weights.GetLength(0); j++)
+                {
+                    result[i] += input[j] * weights[j, i];
+                }
+            }
+
+
+            // Apply ReLu
+            for (int i = 0; i < result.Length; i++)
+            {
+                result[i] = Math.Max(0, result[i]);
+            }
+
+            return result;
+        }
+
+        // Enumerate the inputs of a jagged array in row major
+        protected IEnumerable<float> EnumerateInputs(float[][] inputs)
+        {
+            for (int i = 0; i < inputs.Length; i++)
+            {
+                for (int j = 0; j < inputs[i].Length; j++)
+                {
+                    yield return inputs[i][j];
+                }
+            }
+        }
+
+        // Enumerate the weights in row major layout
+        protected IEnumerable<float> EnumerateWeights(float[,] weights)
+        {
+            for (int i = 0; i < weights.GetLength(0); i++)
+            {
+                for (int j = 0; j < weights.GetLength(1); j++)
+                {
+                    yield return weights[i,j];
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData(4, 32, 16, 1)]
+        [InlineData(64, 256, 128, 1)]
+        [InlineData(1024, 128, 1024, 1)]
+        [InlineData(4, 32, 16, 2)]
+        [InlineData(1, 48, 32, 2)]
+        [InlineData(16, 32, 64, 2)]
+        [InlineData(16, 128, 64, 7)]
+        [InlineData(64, 32, 256, 8)]
+        [InlineData(256, 2048, 1024, 8)]
+        [InlineData(64, 4096, 512, 12)]
+        public async Task TestWithValidationSparseFusedMultiplyAdd(int batchSize, int d1, int d2, int threads)
+        {
+            Random myRandom = new Random(0);
+            ThreadPool pool = new ThreadPool(threads, 1024);
+            AVXHardwareAccelerator accelerator = new AVXHardwareAccelerator(pool);
+            InferenceEngine engine = new InferenceEngine(accelerator);
+
+            float[][] inputs = new float[batchSize][];
+            for (int i = 0; i < batchSize; i++)
+            {
+                float[] inps = new float[d1];
+                for (int j = 0; j < d1; j++)
+                {
+                    inps[j] = myRandom.NextSingle();
+                }
+                inputs[i] = inps;
+            }
+
+
+            float[] bias = new float[d2];
+            for (int i = 0; i < d2; i++)
+            {
+                bias[i] = myRandom.NextSingle();
+            }
+
+            float[,] weights = new float[d1, d2];
+            for (int i = 0; i < d1; i++)
+            {
+                for (int j = 0; j < d2; j++)
+                {
+                    weights[i, j] = myRandom.NextSingle();
+                }
+            }
+
+
+            var weightsLayout = new WeightsTensorMemoryLayout([d1, d2], threads);
+            var weightsTensor = engine.AllocateUninitializedPageAlignedTensor<Tensor2D<float>, float>(weightsLayout, d1, d2);
+            weightsTensor.PopulateWithEnumerable(EnumerateWeights(weights));
+
+            var batchValueLayout = new BatchValueTensorMemoryLayout([batchSize, d1]);
+            var inputsTensor = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d1);
+            inputsTensor.PopulateWithEnumerable(EnumerateInputs(inputs));
+            var biasTensor = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>(bias, d2);
+
+            var outputsTensor = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d2);
+
+            await inputsTensor.SparseFusedMultiplyAdd(weightsTensor, biasTensor, outputsTensor);
+
+            for (int b = 0; b < outputsTensor.Shape[0]; b++)
+            {
+                float[] outputs = MultiplyAddReLU(inputs[b], weights, bias);
+                for (int j = 0; j < outputsTensor.Shape[1]; j++)
+                {
+                    Assert.Equal(outputs[j], outputsTensor[b, j], precision: 0);
+                }
+            }
+        }
+
+
         [Theory]
         [InlineData(4, 32, 16, 1)]
         [InlineData(64, 256, 128, 1)]

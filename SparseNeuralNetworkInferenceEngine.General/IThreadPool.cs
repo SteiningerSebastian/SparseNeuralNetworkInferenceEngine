@@ -21,7 +21,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="func">The function to work on.</param>
         /// <param name="cts">The cacnelation token to cancel the work.</param>
         /// <returns>Null is returned if work could not be scheduled, else the Task for the work is returned.</returns>
-        public Task<K>? Schedule<K>(Func<int, K> func, CancellationToken cts = default);
+        public Task<K>? Schedule<K>(Func<int, CancellationToken, K> func, CancellationToken cts = default);
 
         /// <summary>
         /// Schedules new work to be done.
@@ -29,6 +29,6 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <param name="func">The function to work on.</param>
         /// <param name="cts">The cacnelation token to cancel the work.</param>
         /// <returns>Null is returned if work could not be scheduled, else the Task for the work is returned.</returns>
-        public Task? Schedule(Action<int> func, CancellationToken cts = default);
+        public Task? Schedule(Action<int, CancellationToken> func, CancellationToken cts = default);
      }
 }

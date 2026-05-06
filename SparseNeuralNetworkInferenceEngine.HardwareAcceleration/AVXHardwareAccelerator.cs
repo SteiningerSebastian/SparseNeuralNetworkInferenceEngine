@@ -77,7 +77,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                     float* currentAdd1Ptr = ptrAdd1 + offset;
                     float* currentAdd2Ptr = ptrAdd2 + offset;
 
-                    var th = threadPool.Schedule((_) =>
+                    var th = threadPool.Schedule((_, ct) =>
                     {
                         for (int k = 0; k < workItems; k++)
                         {
@@ -164,7 +164,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                     float* currentAdd1Ptr = ptrAdd1 + offset;
                     float* currentAdd2Ptr = ptrAdd2 + offset;
 
-                    var th = threadPool.Schedule((_) =>
+                    var th = threadPool.Schedule((_, ct) =>
                     {
                         var zeros = Vector.Create<float>(0);
                         for (int k = 0; k < workItems; k++)
@@ -255,7 +255,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
                 float* currentBiasPtr = ptrBias + offsetBias;
                 float* currentActivationPtr = ptrActivations + offsetActivations;
-                var t = threadPool.Schedule((i) =>
+                var t = threadPool.Schedule((i, ct) =>
                 {
 
                     for (int k = 0; k < hKernelsInTask; k++)
@@ -373,7 +373,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                     float* currentInputsPtr = ptrInputs + offsetInputs;
                     float* currentBufferPtr = ptrBuffer;
 
-                    var th = threadPool.Schedule((_) =>
+                    var th = threadPool.Schedule((_, ct) =>
                     {
                         buffer.Clear(); // For performance reason the buffer is created uninitialized, so clear it.
                         var zeros = Vector.Create<float>(0);
