@@ -327,7 +327,7 @@ namespace Meth.Tensor.Tests
                 float[] outputs = MultiplyAddReLU(inputs[b], weights, bias);
                 for (int j = 0; j < outputsTensor.Shape[1]; j++)
                 {
-                    Assert.Equal(outputs[j], outputsTensor[b, j], precision: 0);
+                    Assert.Equal(0, Math.Round(Math.Abs(outputs[j] - outputsTensor[b, j])));
                 }
             }
         }
@@ -365,7 +365,7 @@ namespace Meth.Tensor.Tests
         [Theory]
         [InlineData(4, 16, 1)]
         [InlineData(64, 128, 1)]
-        [InlineData(1024, 1024, 1)]
+        [InlineData(256, 4096, 1)]
         [InlineData(4, 16, 2)]
         [InlineData(1, 32, 2)]
         [InlineData(16, 64, 2)]
