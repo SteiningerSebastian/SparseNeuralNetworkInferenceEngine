@@ -73,7 +73,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         public override Tensor<T> DynamicCast(int[] shape)
         {
             Debug.Assert(shape.Length == 2, $"Operation not supported for tensor of shape ({string.Join(',', shape)}).");
-            Debug.Assert(shape[1] < this.Shape[1], "May only dynamically cast tensor into smaller tensor");
+            Debug.Assert(shape[1] <= this.Shape[1], "May only dynamically cast tensor into smaller tensor");
 
             if (LayoutMapper.GetType() == typeof(BatchValueTensorMemoryLayout))
             {
@@ -110,7 +110,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         {
             if (LayoutMapper.GetType() == typeof(BatchValueTensorMemoryLayout))
             {
-                for (int batch = 0; batch < this.Shape.Length; batch++)
+                for (int batch = 0; batch < this.Shape[0]; batch++)
                 {
                     var enumerable = EnumerateValuesInBatch(batch);
                     var enumerator = function(enumerable).GetEnumerator();

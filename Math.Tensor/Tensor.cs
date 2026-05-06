@@ -58,7 +58,18 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// <summary>
         /// The number of elements in the tensor.
         /// </summary>
-        public int Length { get; protected set; }
+        public int Length
+        {
+            get
+            {
+                int length = Shape[0];
+                for (int i = 1; i < Shape.Length; i++)
+                {
+                    length *= Shape[i];
+                }
+                return length;
+            }
+        }
 
         /// <summary>
         /// Creates a new Tensor of type T. T must be a single or double precision floating point number.
@@ -168,7 +179,6 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 
             obj.data = this.data;
             obj.shape = shape;
-            obj.Length = this.Length;
             obj.LayoutMapper = (ITensorMemoryLayout)this.LayoutMapper.Clone();
             obj.accelerator = accelerator;
 
@@ -187,7 +197,6 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 
             obj.data = this.data.DeepCopy();
             obj.shape = shape.ToArray();
-            obj.Length = this.Length;
             obj.LayoutMapper = (ITensorMemoryLayout)this.LayoutMapper.Clone();
             obj.accelerator = (IHardwareAccelerator?)accelerator?.Clone();
 

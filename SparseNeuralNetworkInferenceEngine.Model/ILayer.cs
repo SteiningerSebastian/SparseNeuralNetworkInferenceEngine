@@ -29,5 +29,19 @@ namespace SparseNeuralNetworkInferenceEngine.Model
         /// </summary>
         /// <param name="parameters">The parameters of the model.</param>
         public void Load(IEnumerator<float> parameters);
+
+        /// <summary>
+        /// Stores the models parameters in the provided store.
+        /// </summary>
+        /// <param name="store">The store to store the model parameters to.</param>
+        /// <returns>The number of floats stored.</returns>
+        public int Store(Span<float> store);
+
+        /// <summary>
+        /// Returns the number of parameters of a layer.
+        /// </summary>
+        /// <returns></returns>
+        public int NumerOfParameters();
+
     }
 }

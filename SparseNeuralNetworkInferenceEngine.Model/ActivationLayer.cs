@@ -29,5 +29,9 @@ namespace SparseNeuralNetworkInferenceEngine.Model
         public void Load(IEnumerator<float> parameters)
         {
         }
+
+        public int NumerOfParameters() => 0;
+
+        public int Store(Span<float> store) => 0;
     }
 }

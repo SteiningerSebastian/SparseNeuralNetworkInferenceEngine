@@ -26,8 +26,6 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             // Can't allign memory to page boundry but not cache line.
             Debug.Assert(!(pageAlligned && !alligned));
 
-            this.Length = length;
-
             nuint typeSize = (nuint)(typeof(T) == typeof(float) ? 4 : 8);
 
             nuint alignment = (nuint)IntPtr.Size; // Standard alignment for the system. (32 vs 64 bit machines)
@@ -99,7 +97,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             {
                 var o = (Tensor1D<T>)this.Clone();
                 // We just decrease the size of the tensor but not the memory.
-                o.Length = shape[0];
+                o.shape = [shape[0]];
                 return o;
             }
 

@@ -20,7 +20,8 @@ namespace SparseNeuralNetworkInferenceEngine.Model
         /// <param name="size">The number of neurons in this layer.</param>
         public DenseLayerAvx(int size, int threadCount, bool useReLU = true)
         {
-            if (size % (Settings.KERNEL_SIZE / sizeof(float)) != 0) {
+            if (size % (Settings.KERNEL_SIZE / sizeof(float)) != 0)
+            {
                 throw new NotSupportedException("Currently only layers with 16, 32, ..., x*16 neurons are supported.");
             }
 
@@ -40,7 +41,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model
 
             weights = engine.AllocateUninitializedPageAlignedTensor<Tensor2D<float>, float>(new WeightsTensorMemoryLayout([inputLength, size], threadCount), [inputLength, size]);
             bias = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>([size]);
-            activation = engine.AllocateUninitializedPageAlignedTensor<Tensor2D<float>, float>(new BatchValueTensorMemoryLayout([batchSize, size]), [batchSize, size]);
+            activation = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(new BatchValueTensorMemoryLayout([batchSize, size]), [batchSize, size]);
 
             return [batchSize, size];
         }
@@ -73,13 +74,43 @@ namespace SparseNeuralNetworkInferenceEngine.Model
                 }
             }
 
-            // Load the bais.
+            // Load the bias.
             for (int i = 0; i < bias.Shape[0]; i++)
             {
                 if (!parameters.MoveNext())
                     throw new IndexOutOfRangeException("Unable to load model from parameters.");
                 bias[i] = parameters.Current;
             }
+        }
+
+        /// <inheritdoc/>
+        public int NumerOfParameters()
+        {
+            return (weights?.Shape[0] ?? 0) * (weights?.Shape[1] ?? 0) + bias?.Length ?? 0;
+        }
+
+        /// <inheritdoc/>
+        public int Store(Span<float> store)
+        {
+            Debug.Assert(weights != null && bias != null, "Unable to store model. (One or more parameter is null)");
+
+            int offset = 0;
+            for (int i = 0; i < weights.Shape[0]; i++)
+            {
+                for (int j = 0; j < weights.Shape[1]; j++)
+                {
+                    store[offset] = weights[i, j];
+                    offset++;
+                }
+            }
+
+            for (int b = 0; b < bias.Length; b++)
+            {
+                store[offset] = bias[b];
+                offset++;
+            }
+
+            return offset;
         }
     }
 }

@@ -27,5 +27,11 @@ namespace SparseNeuralNetworkInferenceEngine.Model
         {
             return tensor.DynamicCast([tensor.Shape[0], length]);
         }
+
+        public void Load(IEnumerator<float> parameters) {}
+
+        public int NumerOfParameters() => 0;
+
+        public int Store(Span<float> store) => 0;
     }
 }

@@ -274,6 +274,11 @@ namespace Meth.Tensor.Tests
         [InlineData(64, 32, 256, 8)]
         [InlineData(256, 2048, 1024, 8)]
         [InlineData(64, 4096, 512, 12)]
+        [InlineData(13, 304, 32, 2)]
+        [InlineData(16, 112, 64, 2)]
+        [InlineData(16, 304, 112, 16)]
+        [InlineData(16, 784, 304, 16)]
+        [InlineData(1, 784, 304, 16)]
         public async Task TestWithValidationSparseFusedMultiplyAdd(int batchSize, int d1, int d2, int threads)
         {
             Random myRandom = new Random(0);
@@ -287,7 +292,7 @@ namespace Meth.Tensor.Tests
                 float[] inps = new float[d1];
                 for (int j = 0; j < d1; j++)
                 {
-                    inps[j] = myRandom.NextSingle();
+                    inps[j] = myRandom.NextSingle() * 2 - 1;
                 }
                 inputs[i] = inps;
             }
@@ -296,7 +301,7 @@ namespace Meth.Tensor.Tests
             float[] bias = new float[d2];
             for (int i = 0; i < d2; i++)
             {
-                bias[i] = myRandom.NextSingle();
+                bias[i] = myRandom.NextSingle() * 2 - 1;
             }
 
             float[,] weights = new float[d1, d2];
@@ -304,10 +309,9 @@ namespace Meth.Tensor.Tests
             {
                 for (int j = 0; j < d2; j++)
                 {
-                    weights[i, j] = myRandom.NextSingle();
+                    weights[i, j] = myRandom.NextSingle()*2 -1;
                 }
             }
-
 
             var weightsLayout = new WeightsTensorMemoryLayout([d1, d2], threads);
             var weightsTensor = engine.AllocateUninitializedPageAlignedTensor<Tensor2D<float>, float>(weightsLayout, d1, d2);
@@ -327,7 +331,7 @@ namespace Meth.Tensor.Tests
                 float[] outputs = MultiplyAddReLU(inputs[b], weights, bias);
                 for (int j = 0; j < outputsTensor.Shape[1]; j++)
                 {
-                    Assert.Equal(0, Math.Round(Math.Abs(outputs[j] - outputsTensor[b, j])));
+                    Assert.Equal(0, outputs[j] - outputsTensor[b, j], precision: 2);
                 }
             }
         }
