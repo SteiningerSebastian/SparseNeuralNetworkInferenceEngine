@@ -9,7 +9,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Math.Tensor\SparseNeuralNetworkInferenceEngine.Math.Tensor.csproj" />
 	</ItemGroup>
 
 </Project>

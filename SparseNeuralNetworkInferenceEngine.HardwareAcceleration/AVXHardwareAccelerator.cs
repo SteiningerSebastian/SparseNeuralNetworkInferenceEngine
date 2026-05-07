@@ -439,7 +439,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                         // Check if whole kernel is zero => skip sparse activations.
                                         if (!(Vector.EqualsAll(zeros, vcInputs1) && Vector.EqualsAll(zeros, vcInputs2)))
                                         {
-
                                             Vector<float> addents1 = Vector.LoadAligned(currentBufferPtr);
                                             Vector<float> addents2 = Vector.LoadAligned(currentBufferPtr + Vector<float>.Count);
 

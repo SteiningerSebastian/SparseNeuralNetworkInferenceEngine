@@ -16,7 +16,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Math.Tensor\SparseNeuralNetworkInferenceEngine.Math.Tensor.csproj" />
+		<ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.Math.Tensor\SparseNeuralNetworkInferenceEngine.Math.Tensor.csproj" />
 		<ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.HardwareAcceleration\SparseNeuralNetworkInferenceEngine.HardwareAcceleration.csproj" />
 		<ProjectReference Include="..\SparseNeuralNetworkInferenceEninge.Engine.Tests\SparseNeualNetworkInferenceEninge.Engine.Tests.csproj" />
 	</ItemGroup>

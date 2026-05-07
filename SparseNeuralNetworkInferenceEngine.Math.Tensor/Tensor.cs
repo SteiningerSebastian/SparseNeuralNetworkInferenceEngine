@@ -21,7 +21,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// <summary>
         /// The alligned memory to be used to store the tensor.
         /// </summary>
-        protected NativeMemoryOwner<T> data;
+        protected NativeMemoryOwner<T> data = null!;
 
         /// <summary>
         /// Returns the data inside the tensor.
@@ -81,6 +81,8 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             {
                 throw new NotSupportedException("Only single or double precision floating point numbers are accepted.");
             }
+
+            LayoutMapper = new RowMajorTensorMemoryLayout(shape);
         }
 
         /// <summary>

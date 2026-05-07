@@ -14,7 +14,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
     /// Holds the native memory for the tensors.
     /// </summary>
     /// <typeparam name="T">The type to store.</typeparam>
-    public unsafe class NativeMemoryOwner<T> : MemoryManager<T>, ICloneable
+    public unsafe class NativeMemoryOwner<T> : MemoryManager<T>, ICloneable where T : unmanaged
     {
         private readonly void* pointer;
         private readonly nuint length;
@@ -63,7 +63,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// <inheritdoc/>
         public override Span<T> GetSpan()
         {
-            if (disposed) 
+            if (disposed)
                 throw new ObjectDisposedException(GetType().FullName);
 
             return new Span<T>(pointer, (int)length);
@@ -71,14 +71,16 @@ namespace SparseNeuralNetworkInferenceEngine.General
 
 
         /// <inheritdoc/>
-        public override MemoryHandle Pin(int elementIndex = 0) => new MemoryHandle((T*)pointer +  elementIndex);
+        public override MemoryHandle Pin(int elementIndex = 0) => new MemoryHandle((T*)pointer + elementIndex);
 
         /// <inheritdoc/>
-        public override void Unpin(){}
+        public override void Unpin() { }
 
         /// <inheritdoc/>
-        protected override void Dispose(bool disposing){
-            if (!disposed) {
+        protected override void Dispose(bool disposing)
+        {
+            if (!disposed)
+            {
                 NativeMemory.Free(pointer);
                 disposed = true; // Making sure memory can only be freed once.
             }

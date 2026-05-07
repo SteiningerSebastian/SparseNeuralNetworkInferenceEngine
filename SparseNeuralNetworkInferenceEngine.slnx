@@ -3,12 +3,13 @@
     <Platform Name="Any CPU" />
     <Platform Name="x64" />
   </Configurations>
-  <Project Path="Math.Tensor/SparseNeuralNetworkInferenceEngine.Math.Tensor.csproj">
+  <Project Path="SparseNeuralNetworkInferenceEngine.Math.Tensor/SparseNeuralNetworkInferenceEngine.Math.Tensor.csproj">
     <Platform Solution="*|x64" Project="x64" />
   </Project>
-  <Project Path="Meth.Tensor.Tests/SparseNeuralNetworkInferenceEngine.Math.Tensor.Tests.csproj">
+  <Project Path="SparseNeuralNetworkInferenceEngine.Math.Tensor.Tests/SparseNeuralNetworkInferenceEngine.Math.Tensor.Tests.csproj">
     <Platform Solution="*|x64" Project="x64" />
   </Project>
+  <Project Path="SparseNeuralNetworkInferenceEngine.Benchmarks/SparseNeuralNetworkInferenceEngine.Benchmarks.csproj" Id="5cd0098d-9221-4464-9794-474fd2b0ed4b" />
   <Project Path="SparseNeuralNetworkInferenceEngine.Engine/SparseNeuralNetworkInferenceEngine.Engine.csproj" Id="adf84ddb-454a-4a1f-977f-16782dc8b9da">
     <Platform Solution="*|x64" Project="x64" />
   </Project>
