@@ -1,0 +1,721 @@
+﻿<!--
+========================================================
+AI GENERATED FILE
+This webpage was generated with AI assistance.
+The authors contribution was minimal.
+
+Prompts and Responses: https://chatgpt.com/share/69fc889b-31a4-832f-b2bf-7ff9955ebee9
+
+Prompts (responses ommited):
+    - Create a webpage single index.html file where one can draw a number from 0 to 9 on a 28x28 grid (mnist) and submit it for inference. Below it there are counters for each digit, on the serverside there are methods  public async Task<int> GetNumber(float[] pixels) which expects the row-major flattened normalized (0-1) image and returns the digit on it. Further there is a method public async Task<int[]> ReceiveCounters() that returns the counters for the digits 0-9 and on the clientside a method OnIncrement(int digit) is expected. Further make this webpage in dark theme and make sure to note on the beginning and on the page (so comment and as text) that it was ai generated
+    - ...
+    - not bad but the brush should be a bit thiker and not 0-1 but any values between it so to look more like actuall mnist images
+    - ...
+    - And what I also don't see are the counters below the input of the digits so there should eb a table with coloumns 0 to 9 and how often they where drawn
+    - ...
+    - could you provide the whole code so everything
+    - ...
+    - its a singalR Hub so the methods i mentioned to inference, onIncrement and receiveCounter are hub methods on /mnist hub
+    - ...
+
+(minimal changes by the author)
+========================================================
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MNIST Digit Inference</title>
+
+    <!--
+    ========================================================
+    AI GENERATED PAGE
+    ========================================================
+    -->
+    <!-- SignalR -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+
+    <style>
+        /*
+        ========================================================
+        AI GENERATED STYLES
+        ========================================================
+        */
+
+        :root {
+            --bg: #0d1117;
+            --panel: #161b22;
+            --panel-2: #1f2630;
+            --border: #30363d;
+            --text: #e6edf3;
+            --muted: #8b949e;
+            --accent: #58a6ff;
+            --success: #3fb950;
+            --danger: #f85149;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 32px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 950px;
+        }
+
+        .notice {
+            background: #2d1f00;
+            border: 1px solid #8b6b00;
+            color: #ffd866;
+            padding: 16px;
+            border-radius: 14px;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+
+        h1 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+
+        p {
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .status {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            display: inline-block;
+            font-size: 0.95rem;
+        }
+
+        .connected {
+            color: var(--success);
+        }
+
+        .disconnected {
+            color: var(--danger);
+        }
+
+        .canvas-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-top: 24px;
+        }
+
+        canvas {
+            background: black;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            image-rendering: pixelated;
+            cursor: crosshair;
+        }
+
+        .buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            border: none;
+            border-radius: 12px;
+            padding: 12px 18px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+
+            button:hover {
+                transform: translateY(-1px);
+            }
+
+        .primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .secondary {
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .result {
+            margin-top: 24px;
+            font-size: 1.2rem;
+        }
+
+        .prediction {
+            color: var(--success);
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .stats-title {
+            margin-top: 36px;
+            margin-bottom: 12px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow: hidden;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: var(--panel-2);
+        }
+
+            .stats-table th,
+            .stats-table td {
+                padding: 14px;
+                text-align: center;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .stats-table th {
+                background: #11161d;
+                color: var(--accent);
+            }
+
+            .stats-table td {
+                color: var(--text);
+                font-size: 1.05rem;
+            }
+
+        .footer {
+            margin-top: 24px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 16px;
+            }
+
+            canvas {
+                width: 100%;
+                height: auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div class="notice">
+            <strong>AI GENERATED PAGE</strong><br />
+            This webpage was generated with AI assistance.
+            The authors contribution was minimal.
+
+            Prompts: https://chatgpt.com/share/69fc889b-31a4-832f-b2bf-7ff9955ebee9
+        </div>
+
+        <div class="card">
+
+            <h1>MNIST Digit Inference</h1>
+
+            <p>
+                Draw a digit from <strong>0-9</strong> on the 28x28 MNIST-style grid
+                and submit it for inference.
+            </p>
+
+            <div class="status">
+                SignalR Status:
+                <span id="connectionStatus" class="disconnected">
+                    Connecting...
+                </span>
+            </div>
+
+            <div class="canvas-wrapper">
+                <canvas id="drawCanvas" width="280" height="280"></canvas>
+            </div>
+
+            <div class="buttons">
+                <button class="primary" onclick="submitDigit()">
+                    Submit for Inference
+                </button>
+
+                <button class="secondary" onclick="clearCanvas()">
+                    Clear
+                </button>
+            </div>
+
+            <div class="result">
+                Prediction:
+                <span class="prediction" id="prediction">-</span>
+            </div>
+
+            <div class="stats-title">
+                Draw Statistics
+            </div>
+
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Digit</th>
+                        <th>Times Drawn</th>
+                    </tr>
+                </thead>
+
+                <tbody id="counterGrid"></tbody>
+            </table>
+
+            <div class="footer">
+                AI generated implementation • SignalR • Dark Theme • MNIST-style brush
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /*
+        ========================================================
+        AI GENERATED SCRIPT
+        ========================================================
+        */
+
+        const canvas = document.getElementById("drawCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const GRID_SIZE = 28;
+        const DISPLAY_SIZE = 280;
+        const CELL_SIZE = DISPLAY_SIZE / GRID_SIZE;
+
+
+        let drawing = false;
+
+        /*
+        ========================================================
+        SignalR connection
+        ========================================================
+        */
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/mnist")
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("onincrement", (coutners) => {
+            renderCounters(coutners)
+
+        });
+
+        async function startConnection() {
+
+            try {
+                await connection.start();
+
+                setConnectionStatus(true);
+
+                console.log("Connected to /mnist hub");
+
+                await loadCounters();
+
+            } catch (err) {
+
+                console.error(err);
+
+                setConnectionStatus(false);
+
+                setTimeout(startConnection, 3000);
+            }
+        }
+
+        function setConnectionStatus(connected) {
+
+            const status = document.getElementById("connectionStatus");
+
+            if (connected) {
+
+                status.textContent = "Connected";
+                status.className = "connected";
+
+            } else {
+
+                status.textContent = "Disconnected";
+                status.className = "disconnected";
+            }
+        }
+
+        connection.onclose(() => {
+
+            setConnectionStatus(false);
+        });
+
+        connection.onreconnected(() => {
+
+            setConnectionStatus(true);
+        });
+
+        startConnection();
+
+        /*
+        ========================================================
+        MNIST pixel buffer [0..1]
+        ========================================================
+        */
+
+        const pixelGrid = Array.from({ length: GRID_SIZE }, () =>
+            Array(GRID_SIZE).fill(0)
+        );
+
+        /*
+        ========================================================
+        Brush configuration
+        ========================================================
+        */
+
+        const BRUSH_RADIUS = 1.9;
+        const BRUSH_STRENGTH = 0.42;
+
+        /*
+        ========================================================
+        Render canvas
+        ========================================================
+        */
+
+        function render() {
+
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+
+                for (let x = 0; x < GRID_SIZE; x++) {
+
+                    const value = pixelGrid[y][x];
+
+                    const intensity = Math.floor(value * 255);
+
+                    ctx.fillStyle =
+                        `rgb(${intensity}, ${intensity}, ${intensity})`;
+
+                    ctx.fillRect(
+                        x * CELL_SIZE,
+                        y * CELL_SIZE,
+                        CELL_SIZE,
+                        CELL_SIZE
+                    );
+                }
+            }
+
+            drawGrid();
+        }
+
+        /*
+        ========================================================
+        Grid overlay
+        ========================================================
+        */
+
+        function drawGrid() {
+
+            ctx.strokeStyle = "#202938";
+            ctx.lineWidth = 1;
+
+            for (let i = 0; i <= GRID_SIZE; i++) {
+
+                const pos = i * CELL_SIZE;
+
+                ctx.beginPath();
+                ctx.moveTo(pos, 0);
+                ctx.lineTo(pos, DISPLAY_SIZE);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, pos);
+                ctx.lineTo(DISPLAY_SIZE, pos);
+                ctx.stroke();
+            }
+        }
+
+        /*
+        ========================================================
+        Mouse helper
+        ========================================================
+        */
+
+        function getMousePosition(event) {
+
+            const rect = canvas.getBoundingClientRect();
+
+            return {
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top
+            };
+        }
+
+        /*
+        ========================================================
+        Soft MNIST brush
+        ========================================================
+        */
+
+        function applyBrush(gridX, gridY) {
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+
+                for (let x = 0; x < GRID_SIZE; x++) {
+
+                    const dx = x - gridX;
+                    const dy = y - gridY;
+
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance <= BRUSH_RADIUS) {
+
+                        const influence =
+                            (1 - (distance / BRUSH_RADIUS))
+                            * BRUSH_STRENGTH;
+
+                        pixelGrid[y][x] = Math.min(
+                            1,
+                            pixelGrid[y][x] + influence
+                        );
+                    }
+                }
+            }
+        }
+
+        /*
+        ========================================================
+        Drawing
+        ========================================================
+        */
+
+        function draw(event) {
+
+            if (!drawing) return;
+
+            const pos = getMousePosition(event);
+
+            const gridX = pos.x / CELL_SIZE;
+            const gridY = pos.y / CELL_SIZE;
+
+            applyBrush(gridX, gridY);
+
+            render();
+        }
+
+        /*
+        ========================================================
+        Mouse events
+        ========================================================
+        */
+
+        canvas.addEventListener("mousedown", () => {
+            drawing = true;
+        });
+
+        canvas.addEventListener("mouseup", () => {
+            drawing = false;
+        });
+
+        canvas.addEventListener("mouseleave", () => {
+            drawing = false;
+        });
+
+        canvas.addEventListener("mousemove", draw);
+
+        /*
+        ========================================================
+        Touch support
+        ========================================================
+        */
+
+        canvas.addEventListener("touchstart", (e) => {
+
+            e.preventDefault();
+
+            drawing = true;
+        });
+
+        canvas.addEventListener("touchend", () => {
+
+            drawing = false;
+        });
+
+        canvas.addEventListener("touchmove", (e) => {
+
+            e.preventDefault();
+
+            if (!drawing) return;
+
+            const touch = e.touches[0];
+
+            const rect = canvas.getBoundingClientRect();
+
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+
+            const gridX = x / CELL_SIZE;
+            const gridY = y / CELL_SIZE;
+
+            applyBrush(gridX, gridY);
+
+            render();
+        });
+
+        /*
+        ========================================================
+        Clear canvas
+        ========================================================
+        */
+
+        function clearCanvas() {
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+
+                for (let x = 0; x < GRID_SIZE; x++) {
+
+                    pixelGrid[y][x] = 0;
+                }
+            }
+
+            render();
+
+            document.getElementById("prediction").textContent = "-";
+        }
+
+        /*
+        ========================================================
+        Flatten pixels row-major normalized [0..1]
+        ========================================================
+        */
+
+        function extractPixels() {
+
+            const pixels = [];
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+
+                for (let x = 0; x < GRID_SIZE; x++) {
+
+                    pixels.push(pixelGrid[y][x]);
+                }
+            }
+
+            return pixels;
+        }
+
+        /*
+        ========================================================
+        SignalR Hub Method:
+        public async Task<int> GetNumber(float[] pixels)
+        ========================================================
+        */
+
+        async function submitDigit() {
+
+            try {
+
+                const pixels = extractPixels();
+
+                const digit = await connection.invoke(
+                    "GetNumber",
+                    pixels
+                );
+
+                document.getElementById("prediction").textContent = digit;
+
+            } catch (error) {
+
+                console.error(error);
+
+                alert("Inference failed.");
+            }
+        }
+
+        /*
+        ========================================================
+        SignalR Hub Method:
+        public async Task<int[]> ReceiveCounters()
+        ========================================================
+        */
+
+        async function loadCounters() {
+
+            try {
+
+                const counters = await connection.invoke(
+                    "ReceiveCounters"
+                );
+
+                renderCounters(counters);
+
+            } catch (error) {
+
+                console.error(error);
+            }
+        }
+
+        /*
+        ========================================================
+        Render counter table
+        ========================================================
+        */
+
+        function renderCounters(counters) {
+
+            const grid = document.getElementById("counterGrid");
+
+            grid.innerHTML = "";
+
+            for (let i = 0; i < 10; i++) {
+
+                const row = document.createElement("tr");
+
+                row.innerHTML = `
+                                                <td><strong>${i}</strong></td>
+                                                <td>${counters[i] ?? 0}</td>
+                                            `;
+
+                grid.appendChild(row);
+            }
+        }
+
+        /*
+        ========================================================
+        Initial render
+        ========================================================
+        */
+
+        render();
+
+    </script>
+
+</body>
+</html>
