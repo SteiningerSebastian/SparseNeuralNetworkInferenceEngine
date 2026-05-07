@@ -404,25 +404,31 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                         var vcInputs = Vector.LoadAligned(currentInputsPtr);
 
                                         // Check if whole kernel is zero => skip sparse activations.
-                                        if (Vector.EqualsAll(zeros, vcInputs))
-                                            continue;
-
-                                        Vector<float> addents = Vector.LoadAligned(currentBufferPtr);
-
-                                        for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
+                                        if (!Vector.EqualsAll(zeros, vcInputs))
                                         {
-                                            Vector<float> vecWeights = Vector.LoadAligned(currentWeightsPtr);
 
-                                            float x = *currentInputsPtr; // Load the input from inputs
-                                            addents = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights, addents);
+                                            Vector<float> addents = Vector.LoadAligned(currentBufferPtr);
 
-                                            // move the weigths point to next line.
-                                            currentWeightsPtr += KERNEL_SIZE_IN_FLOATS;
+                                            for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
+                                            {
+                                                Vector<float> vecWeights = Vector.LoadAligned(currentWeightsPtr);
 
-                                            currentInputsPtr += 1; // Increas inputs pointer for next line
+                                                float x = *currentInputsPtr; // Load the input from inputs
+                                                addents = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights, addents);
+
+                                                // move the weigths point to next line.
+                                                currentWeightsPtr += KERNEL_SIZE_IN_FLOATS;
+
+                                                currentInputsPtr += 1; // Increas inputs pointer for next line
+                                            }
+
+                                            Vector.Store(addents, currentBufferPtr); // Store the result back in the buffer.
                                         }
-
-                                        Vector.Store(addents, currentBufferPtr); // Store the result back in the buffer.
+                                        else
+                                        {
+                                            currentWeightsPtr += KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
+                                            currentInputsPtr += KERNEL_SIZE_IN_FLOATS;
+                                        }
                                     }
                                     else // Again for machines that only support AVX2 / a 256 bit register do the work in sequence.
                                     // This should be reordered by the JIT to work best on the current plattform
@@ -431,29 +437,35 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                         var vcInputs2 = Vector.LoadAligned(currentInputsPtr + Vector<float>.Count);
 
                                         // Check if whole kernel is zero => skip sparse activations.
-                                        if (Vector.EqualsAll(zeros, vcInputs1) && Vector.EqualsAll(zeros, vcInputs2))
-                                            continue;
-
-                                        Vector<float> addents1 = Vector.LoadAligned(currentBufferPtr);
-                                        Vector<float> addents2 = Vector.LoadAligned(currentBufferPtr + Vector<float>.Count);
-
-                                        for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
+                                        if (!(Vector.EqualsAll(zeros, vcInputs1) && Vector.EqualsAll(zeros, vcInputs2)))
                                         {
-                                            Vector<float> vecWeights1 = Vector.LoadAligned(currentWeightsPtr);
-                                            Vector<float> vecWeights2 = Vector.LoadAligned(currentWeightsPtr + Vector<float>.Count);
 
-                                            float x = *currentInputsPtr; // Load the input from inputs
-                                            addents1 = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights1, addents1);
-                                            addents2 = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights2, addents2);
+                                            Vector<float> addents1 = Vector.LoadAligned(currentBufferPtr);
+                                            Vector<float> addents2 = Vector.LoadAligned(currentBufferPtr + Vector<float>.Count);
 
-                                            // move the weigths point to next line.
-                                            currentWeightsPtr += KERNEL_SIZE_IN_FLOATS;
+                                            for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
+                                            {
+                                                Vector<float> vecWeights1 = Vector.LoadAligned(currentWeightsPtr);
+                                                Vector<float> vecWeights2 = Vector.LoadAligned(currentWeightsPtr + Vector<float>.Count);
 
-                                            currentInputsPtr += 1; // Increas inputs pointer for next line
+                                                float x = *currentInputsPtr; // Load the input from inputs
+                                                addents1 = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights1, addents1);
+                                                addents2 = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights2, addents2);
+
+                                                // move the weigths point to next line.
+                                                currentWeightsPtr += KERNEL_SIZE_IN_FLOATS;
+
+                                                currentInputsPtr += 1; // Increas inputs pointer for next line
+                                            }
+
+                                            Vector.Store(addents1, currentBufferPtr); // Store the result back in the buffer.
+                                            Vector.Store(addents2, currentBufferPtr + Vector<float>.Count); // Store the result back in the buffer.
                                         }
-
-                                        Vector.Store(addents1, currentBufferPtr); // Store the result back in the buffer.
-                                        Vector.Store(addents2, currentBufferPtr + Vector<float>.Count); // Store the result back in the buffer.
+                                        else
+                                        {
+                                            currentWeightsPtr += KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
+                                            currentInputsPtr += KERNEL_SIZE_IN_FLOATS;
+                                        }
                                     }
 
                                     // Move the buffer we work on.

@@ -12,7 +12,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model
 
         protected int size;
         protected int threadCount;
-        protected bool useReLu;
+        protected bool useReLU;
 
         /// <summary>
         /// Creates a new Dense layer.
@@ -27,7 +27,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model
 
             this.size = size;
             this.threadCount = threadCount;
-            this.useReLu = useReLU;
+            this.useReLU = useReLU;
         }
 
         /// <inheritdoc/>
@@ -39,9 +39,11 @@ namespace SparseNeuralNetworkInferenceEngine.Model
             int inputLength = inputShape[1];
             int batchSize = inputShape[0];
 
-            weights = engine.AllocateUninitializedPageAlignedTensor<Tensor2D<float>, float>(new WeightsTensorMemoryLayout([inputLength, size], threadCount), [inputLength, size]);
-            bias = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>([size]);
-            activation = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(new BatchValueTensorMemoryLayout([batchSize, size]), [batchSize, size]);
+            var weightsLayout = new WeightsTensorMemoryLayout([inputLength, size], threadCount);
+            weights = engine.AllocateUninitializedPageAlignedTensor<Tensor2D<float>, float>(weightsLayout, [inputLength, size]);
+            bias = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>(size);
+            var batchValueLayout = new BatchValueTensorMemoryLayout(batchSize, size);
+            activation = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, [batchSize, size]);
 
             return [batchSize, size];
         }
@@ -53,34 +55,32 @@ namespace SparseNeuralNetworkInferenceEngine.Model
             Debug.Assert(weights != null && bias != null && activation != null, "Can't invoke uncompiled layer.");
             Debug.Assert(tensor.GetType() == typeof(Tensor2D<float>), "Expected a Tensor2D of type float.");
 
-            var input = (Tensor2D<float>)(object)tensor;
+            var input = (Tensor2D<float>)tensor;
 
-            await input.SparseFusedMultiplyAdd(weights, bias, activation);
+            await input.SparseFusedMultiplyAdd(weights, bias, activation, useReLU);
 
             return activation;
+        }
+
+        /// <summary>
+        /// Turns the enumerator to an enumerable for layers.
+        /// </summary>
+        /// <param name="enumerator">The enumerator over all parameters of the model.</param>
+        /// <returns>An enumerable using the enumerator.</returns>
+        protected IEnumerable<float> EnumeratorToEnumerable(IEnumerator<float> enumerator)
+        {
+            while(enumerator.MoveNext())
+            {
+                yield return enumerator.Current;
+            }
         }
 
         public void Load(IEnumerator<float> parameters)
         {
             Debug.Assert(weights != null && bias != null && activation != null, "Can't load parameters of uncompiled model.");
-            // Load the weights.
-            for (int i = 0; i < weights.Shape[0]; i++)
-            {
-                for (int j = 0; j < weights.Shape[1]; j++)
-                {
-                    if (!parameters.MoveNext())
-                        throw new IndexOutOfRangeException("Unable to load model from parameters.");
-                    weights[i, j] = parameters.Current;
-                }
-            }
 
-            // Load the bias.
-            for (int i = 0; i < bias.Shape[0]; i++)
-            {
-                if (!parameters.MoveNext())
-                    throw new IndexOutOfRangeException("Unable to load model from parameters.");
-                bias[i] = parameters.Current;
-            }
+            weights.PopulateWithEnumerable(EnumeratorToEnumerable(parameters).Take(weights.Shape[0] * weights.Shape[1]));
+            bias.PopulateWithEnumerable(EnumeratorToEnumerable(parameters).Take(bias.Length));
         }
 
         /// <inheritdoc/>

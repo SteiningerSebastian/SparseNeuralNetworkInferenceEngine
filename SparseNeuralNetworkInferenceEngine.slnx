@@ -12,6 +12,7 @@
   <Project Path="SparseNeuralNetworkInferenceEngine.Engine/SparseNeuralNetworkInferenceEngine.Engine.csproj" Id="adf84ddb-454a-4a1f-977f-16782dc8b9da">
     <Platform Solution="*|x64" Project="x64" />
   </Project>
+  <Project Path="SparseNeuralNetworkInferenceEngine.Example.MNISTWebserver/SparseNeuralNetworkInferenceEngine.Example.MNISTWebserver.csproj" Id="80bd288d-1746-466b-b52f-0cdb339074ed" />
   <Project Path="SparseNeuralNetworkInferenceEngine.General.Tests/SparseNeuralNetworkInferenceEngine.General.Tests.csproj" Id="6280a8ae-ef70-47a0-987d-0a17531eb6e4">
     <Platform Solution="*|x64" Project="x64" />
   </Project>

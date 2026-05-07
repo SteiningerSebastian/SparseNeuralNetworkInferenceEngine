@@ -20,8 +20,15 @@ namespace SparseNeuralNetworkInferenceEngine.Math
 
         public IEnumerable<float> Invoke(IEnumerable<float> values)
         {
+            if(length != -1)
+                values = values.Take(length);
+
             float sum = values.Take(length).Select(v=>System.MathF.Exp(v)).Sum();
-            return values.Select(v=>System.MathF.Exp(v) /  sum);
+
+            foreach (float v in values)
+            {
+                yield return System.MathF.Exp(v) / sum;
+            }
         }
     }
 }

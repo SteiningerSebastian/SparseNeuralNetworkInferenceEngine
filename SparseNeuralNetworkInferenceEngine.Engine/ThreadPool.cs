@@ -64,7 +64,7 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
             }
             this.cts = cts;
             Capacity = capacity;
-            semaphore = new SemaphoreSlim(0, capacity);
+            semaphore = new SemaphoreSlim(0);
 
             Priority = priority;
             this.threads = new List<Thread>(threads);
@@ -123,11 +123,12 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
         /// <param name="threadId">The thread id that calls this Thread</param>
         protected void BeginThread(int threadId, CancellationToken ct)
         {
+            CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(ct, this.cts.Token);
+            ct = cts.Token;
             while (!ct.IsCancellationRequested)
             {
                 // Waiting for work to be scheduled.
-                var waitHandle = semaphore.AvailableWaitHandle;
-                WaitHandle.WaitAny([waitHandle, ct.WaitHandle]);
+                semaphore.Wait(ct);
 
                 if (ct.IsCancellationRequested)
                     break;

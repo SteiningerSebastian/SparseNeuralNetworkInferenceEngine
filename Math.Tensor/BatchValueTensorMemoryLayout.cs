@@ -11,14 +11,14 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
     {
         protected int[] shape;
 
-        public BatchValueTensorMemoryLayout(int[] shape)
+        public BatchValueTensorMemoryLayout(int batches, int elements)
         {
-            this.shape = shape;
+            this.shape = [batches, elements];
         }
 
         public object Clone()
         {
-            return new BatchValueTensorMemoryLayout(shape.ToArray());
+            return new BatchValueTensorMemoryLayout(shape[0], shape[1]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

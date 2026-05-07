@@ -1,4 +1,5 @@
-﻿using SparseNeuralNetworkInferenceEngine.Engine;
+﻿using Microsoft.VisualStudio.TestPlatform.PlatformAbstractions.Interfaces;
+using SparseNeuralNetworkInferenceEngine.Engine;
 using SparseNeuralNetworkInferenceEngine.General;
 using SparseNeuralNetworkInferenceEngine.HardwareAcceleration;
 using SparseNeuralNetworkInferenceEngine.Math;
@@ -31,7 +32,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
             // Compile the model
             model.Compile();
 
-            Tensor2D<float> inputs = engine.AllocateAlignedTensor<Tensor2D<float>, float>(new BatchValueTensorMemoryLayout([32, 784]), 32, 784);
+            Tensor2D<float> inputs = engine.AllocateAlignedTensor<Tensor2D<float>, float>(new BatchValueTensorMemoryLayout(32, 784), 32, 784);
             inputs.PopulateWithEnumerable(Enumerable.Range(0, 32 * 784).Select(a => random.NextSingle() * 2 - 1));
 
             var res = await model.InvokeAsync(inputs);
@@ -74,7 +75,6 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
             //    }
             //}
 
-
             Assert.True(par.SequenceEqual(floats));
         }
 
@@ -85,12 +85,12 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
             IHardwareAccelerator accelerator = new AVXHardwareAccelerator(threadPool);
             IInferenceEngine engine = new InferenceEngine(accelerator);
 
-            const int BATCH_SIZE = 1;
+            const int BATCH_SIZE = 4;
             const int INPUT_SIZE = 784;
 
             ModelSequential model = new ModelSequential([
                 new InputLayer([BATCH_SIZE, INPUT_SIZE]),
-                new DenseLayerAvx(304,threadPool.NumberOfThreads),
+                new DenseLayerAvx(304, threadPool.NumberOfThreads),
                 new DenseLayerAvx(112, threadPool.NumberOfThreads),
                 new DenseLayerAvx(16, threadPool.NumberOfThreads, false),
                 new ActivationLayer(new SoftMaxActivationFunction(10)),
@@ -104,10 +104,22 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
 
             float[] inps = await BinaryLoader.ReadFileToFloatEnumerableAsync("E:/IUBScSparseNeuralNetworkInferenceEngine/Models/MNIST304_112_10_Sparsity_59/x_test_flattened.bin");
 
-            Tensor2D<float> inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(new BatchValueTensorMemoryLayout([BATCH_SIZE, INPUT_SIZE]), BATCH_SIZE, INPUT_SIZE);
+            var inputLayout = new BatchValueTensorMemoryLayout(BATCH_SIZE, INPUT_SIZE);
+            Tensor2D<float> inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(inputLayout, BATCH_SIZE, INPUT_SIZE);
             inputs.PopulateWithEnumerable(inps.AsSpan().Slice(0, BATCH_SIZE * INPUT_SIZE).ToArray());
 
             var res = await model.InvokeAsync(inputs);
+
+            float[][] results = new float[BATCH_SIZE][];
+            for (int batch = 0; batch < res.Shape[0]; batch++)
+            {
+                float[] arrRes = new float[res.Shape[1]];
+                for (int i = 0; i < arrRes.Length; i++)
+                {
+                    arrRes[i] = res[batch, i];
+                }
+                results[batch]= arrRes;
+            }
 
             float[] expected = await BinaryLoader.ReadFileToFloatEnumerableAsync("E:/IUBScSparseNeuralNetworkInferenceEngine/Models/MNIST304_112_10_Sparsity_59/y_test_predictions.bin");
 
@@ -115,7 +127,12 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
             {
                 for (int i = 0; i < res.Shape[1]; i++)
                 {
-                    Assert.Equal(0, expected[BATCH_SIZE * batch + i] - res[batch, i], precision: 1);
+                    if (System.Math.Abs(expected[10 * batch + i] - res[batch, i]) > 0.1)
+                    {
+                        Debug.WriteLine($"Detected an error in output {i}. Expected {expected[10 * batch + i]} Actual: {res[batch, i]}");
+                    }
+
+                    Assert.Equal(0, expected[10 * batch + i] - res[batch, i], precision: 1);
                 }
             }
         }

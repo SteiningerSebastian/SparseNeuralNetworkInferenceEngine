@@ -131,7 +131,6 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
         public T AllocateUninitializedTensor<T,K>(ITensorMemoryLayout layout, IEnumerable<K> values, params int[] shape) where T : ITensor<K> where K: unmanaged =>
            AllocateTensor<T,K>(shape, layout, false, false, false, values);
 
-
         /// <summary>
         /// Allocates a new uninitialized aligned tensor with the given layout and shape.
         /// </summary>

@@ -4,6 +4,7 @@ using SparseNeuralNetworkInferenceEngine.Engine;
 using SparseNeuralNetworkInferenceEngine.HardwareAcceleration;
 using ThreadPool = SparseNeuralNetworkInferenceEngine.Engine.ThreadPool;
 using System.Diagnostics;
+using SparseNeuralNetworkInferenceEngine.General;
 
 namespace Meth.Tensor.Tests
 {
@@ -18,8 +19,7 @@ namespace Meth.Tensor.Tests
         [InlineData(61, 0)]
         public void BatchValueTensorMemoryMapper(int b, int a)
         {
-            int[] shape = [64, 64];
-            var mapper = new BatchValueTensorMemoryLayout(shape);
+            var mapper = new BatchValueTensorMemoryLayout(64, 64);
 
             int offset = mapper.MapToMemory([b, a]);
             int[] index = mapper.MapToTensor(offset);
@@ -31,7 +31,7 @@ namespace Meth.Tensor.Tests
         [Fact]
         public void Constructor()
         {
-            var mapper = new BatchValueTensorMemoryLayout([64, 64]);
+            var mapper = new BatchValueTensorMemoryLayout(64, 64);
             var values = Enumerable.Range(0, 64 * 64).Select(a => (float)a);
             Tensor2D<float> tensor = new Tensor2D<float>(64, 64, mapper, false, true, true, values);
             tensor.SequenceEqual(values);
@@ -68,7 +68,7 @@ namespace Meth.Tensor.Tests
         [Fact]
         public void Enumerator()
         {
-            var mapper = new BatchValueTensorMemoryLayout([64, 64]);
+            var mapper = new BatchValueTensorMemoryLayout(64, 64);
             Tensor2D<float> tensor = new Tensor2D<float>(64, 64, mapper, false, true, true, null);
 
             var values = Enumerable.Range(0, 64 * 64).Select(a => (float)a);
@@ -163,6 +163,33 @@ namespace Meth.Tensor.Tests
         }
 
         [Theory]
+        [InlineData(4, 16)]
+        [InlineData(16, 64)]
+        [InlineData(64, 256)]
+        [InlineData(13, 1024)]
+        [InlineData(41, 128)]
+        [InlineData(17, 784)]
+        [InlineData(1024, 304)]
+        public void BatchValueTensorMemoryLayout(int batches, int elements)
+        {
+            var batchValueLayout = new BatchValueTensorMemoryLayout(batches, elements);
+
+            int expected = 0;
+            for (int colStart = 0; colStart < elements; colStart += (Settings.KERNEL_SIZE / (sizeof(float))))
+            {
+                for (int batch = 0; batch < batches; batch++)
+                {
+                    for (int i = colStart; i < colStart + (Settings.KERNEL_SIZE / (sizeof(float))); i++)
+                    {
+                        Assert.Equal(expected, batchValueLayout.MapToMemory([batch, i]));
+
+                        expected++;
+                    }
+                }
+            }
+        }
+
+        [Theory]
         [InlineData(128, 128, 1)]
         [InlineData(128, 128, 2)]
         [InlineData(128, 128, 3)]
@@ -237,7 +264,10 @@ namespace Meth.Tensor.Tests
             }
 
             return result;
+
         }
+
+
 
         // Enumerate the inputs of a jagged array in row major
         protected IEnumerable<float> EnumerateInputs(float[][] inputs)
@@ -258,7 +288,7 @@ namespace Meth.Tensor.Tests
             {
                 for (int j = 0; j < weights.GetLength(1); j++)
                 {
-                    yield return weights[i,j];
+                    yield return weights[i, j];
                 }
             }
         }
@@ -278,7 +308,7 @@ namespace Meth.Tensor.Tests
         [InlineData(16, 112, 64, 2)]
         [InlineData(16, 304, 112, 16)]
         [InlineData(16, 784, 304, 16)]
-        [InlineData(1, 784, 304, 16)]
+        [InlineData(2, 784, 304, 16)]
         public async Task TestWithValidationSparseFusedMultiplyAdd(int batchSize, int d1, int d2, int threads)
         {
             Random myRandom = new Random(0);
@@ -309,7 +339,7 @@ namespace Meth.Tensor.Tests
             {
                 for (int j = 0; j < d2; j++)
                 {
-                    weights[i, j] = myRandom.NextSingle()*2 -1;
+                    weights[i, j] = myRandom.NextSingle() * 2 - 1;
                 }
             }
 
@@ -317,14 +347,41 @@ namespace Meth.Tensor.Tests
             var weightsTensor = engine.AllocateUninitializedPageAlignedTensor<Tensor2D<float>, float>(weightsLayout, d1, d2);
             weightsTensor.PopulateWithEnumerable(EnumerateWeights(weights));
 
-            var batchValueLayout = new BatchValueTensorMemoryLayout([batchSize, d1]);
+            var batchValueLayout = new BatchValueTensorMemoryLayout(batchSize, d1);
             var inputsTensor = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d1);
             inputsTensor.PopulateWithEnumerable(EnumerateInputs(inputs));
             var biasTensor = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>(bias, d2);
 
             var outputsTensor = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d2);
 
-            await inputsTensor.SparseFusedMultiplyAdd(weightsTensor, biasTensor, outputsTensor);
+            var activationsTensor = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d2);
+
+            await inputsTensor.SparseFusedMultiplyAdd(weightsTensor, biasTensor, outputsTensor, true);
+
+            // Do the same calculations on tensors to make sure the layout and indexing is also working.
+            for (int batch = 0; batch < inputsTensor.Shape[0]; batch++)
+            {
+                // Copy bias to activations
+                for (int act = 0; act < activationsTensor.Shape[1]; act++)
+                {
+                    activationsTensor[batch, act] = bias[act];
+                }
+
+                // Perform the matrix multiplication
+                for (int act = 0; act < activationsTensor.Shape[1]; act++)
+                {
+                    for (int i = 0; i < weightsTensor.Shape[0]; i++)
+                    {
+                        activationsTensor[batch, act] += inputsTensor[batch, i] * weights[i, act];
+                    }
+                }
+
+                // Apply ReLU
+                for (int act = 0; act < activationsTensor.Shape[1]; act++)
+                {
+                    activationsTensor[batch, act] = MathF.Max(0, activationsTensor[batch, act]);
+                }
+            }
 
             for (int b = 0; b < outputsTensor.Shape[0]; b++)
             {
@@ -332,6 +389,7 @@ namespace Meth.Tensor.Tests
                 for (int j = 0; j < outputsTensor.Shape[1]; j++)
                 {
                     Assert.Equal(0, outputs[j] - outputsTensor[b, j], precision: 2);
+                    Assert.Equal(0, activationsTensor[b, j] - outputsTensor[b, j], precision: 2);
                 }
             }
         }
@@ -357,13 +415,13 @@ namespace Meth.Tensor.Tests
             var weightsLayout = new WeightsTensorMemoryLayout([d1, d2], threads);
             var weights = engine.AllocateUninitializedPageAlignedTensor<Tensor2D<float>, float>(weightsLayout, d1, d2);
 
-            var batchValueLayout = new BatchValueTensorMemoryLayout([batchSize, d1]);
+            var batchValueLayout = new BatchValueTensorMemoryLayout(batchSize, d1);
             var inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d1);
             var bias = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>(d2);
 
             var outputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d2);
 
-            await inputs.SparseFusedMultiplyAdd(weights, bias, outputs);
+            await inputs.SparseFusedMultiplyAdd(weights, bias, outputs, true);
         }
 
         [Theory]
@@ -394,7 +452,7 @@ namespace Meth.Tensor.Tests
                 }
             }
 
-            var batchValueLayout = new BatchValueTensorMemoryLayout([batchSize, d1]);
+            var batchValueLayout = new BatchValueTensorMemoryLayout(batchSize, d1);
             var inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d1);
             var bias = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>(d1);
 
@@ -411,7 +469,7 @@ namespace Meth.Tensor.Tests
 
             var outputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, batchSize, d1);
 
-            await inputs.SparseFusedMultiplyAdd(weights, bias, outputs);
+            await inputs.SparseFusedMultiplyAdd(weights, bias, outputs, true);
 
             // Because we use the identity matrix and the matrix is square we expect the inputs as output but because we
             // add a bias thats the same we expect 2x input

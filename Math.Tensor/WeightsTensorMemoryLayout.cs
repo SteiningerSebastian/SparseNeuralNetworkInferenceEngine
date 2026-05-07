@@ -31,7 +31,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 
         public object Clone()
         {
-            return new BatchValueTensorMemoryLayout(shape.ToArray());
+            return new WeightsTensorMemoryLayout(shape.ToArray(), threads);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

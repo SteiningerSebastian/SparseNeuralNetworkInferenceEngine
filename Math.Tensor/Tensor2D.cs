@@ -40,8 +40,9 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// </summary>
         /// <param name="weights">The weights tensor stored in WeightTensorMemoryLayout.</param>
         /// <param name="bias">The bias tensor stored in the BatchValueTensorLayout.</param>
-        /// <param name="result">The result, a tensor stored in the BatchValueTensorLayout.</param>
-        public async Task SparseFusedMultiplyAdd(Tensor2D<float> weights, Tensor1D<float> bias, Tensor2D<float> result)
+        /// <param name="activations">The result, a tensor stored in the BatchValueTensorLayout.</param>
+        /// <param name="applyReLU">If the ReLU activation function should be applied</param>
+        public async Task SparseFusedMultiplyAdd(Tensor2D<float> weights, Tensor1D<float> bias, Tensor2D<float> activations, bool applyReLU)
         {
             if (typeof(T) != typeof(float))
                 throw new NotImplementedException("Sparse Fused Multiply Add is only supported with single precision floating point numbers.");
@@ -49,25 +50,73 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             // Making sure the layout of the Tensor matches the supported layout for the tensors
             Debug.Assert(weights.LayoutMapper.GetType() == typeof(WeightsTensorMemoryLayout), "Expected WeightsTensorMemoryMapper for weight tensor.");
             Debug.Assert(bias.LayoutMapper.GetType() == typeof(RowMajorTensorMemoryLayout), "Expected RowMajorTensorMemoryLayout for bais tensor.");
-            Debug.Assert(result.LayoutMapper.GetType() == typeof(BatchValueTensorMemoryLayout), "Expected BatchValueTensorMemoryMapper for result tensor.");
+            Debug.Assert(activations.LayoutMapper.GetType() == typeof(BatchValueTensorMemoryLayout), "Expected BatchValueTensorMemoryMapper for result tensor.");
 
             // Making sure their shape matches.
             Debug.Assert(weights.Shape[0] == Shape[1], $"Unable to multiply tensors of shape ({string.Join(',', Shape)}) and ({string.Join(',', Shape)}).");
-            Debug.Assert(Shape[0] == result.Shape[0], $"Unable to store result in tensor of shape ({string.Join(',', result.Shape)})");
+            Debug.Assert(Shape[0] == activations.Shape[0], $"Unable to store result in tensor of shape ({string.Join(',', activations.Shape)})");
 
             Debug.Assert(weights.Shape[0] % 16 == 0 && weights.Shape[1] % 16 == 0, "Shape of weights must be divisible by 16.");
 
             Debug.Assert(accelerator is ISparseFusedMultiplyAddReLU, "This Operation is only supported with an hardware accelerator as its slow otherwise.");
 
+
             if (accelerator is ISparseFusedMultiplyAddReLU acc)
             {
                 Span<float> inputs = MemoryMarshal.Cast<T, float>(data.Data);
 
-                await acc.FusedMultiplyAdd(shape[0], weights.shape, inputs, weights.data.Data, bias.GetValues(), result.data);
+                await acc.FusedMultiplyAdd(Shape[0], weights.Shape, inputs, weights.data.Data, bias.GetValues(), activations.data, applyReLU);
+
+#if DEBUG
+                // For debugging it is very usefull to make sure the result is correct for each hardware
+                // accelerated operation to make sure not to propagate errors. 
+                // Comment this code in and out as needed, it is very expensive to run and should never be used in production.
+                #region Debugging Assert
+                //var assertActivations = activations.DeepCopy();
+
+                //for (int batch = 0; batch < Shape[0]; batch++)
+                //{
+                //    // Copy bias to activations
+                //    for(int act = 0; act < assertActivations.Shape[1]; act++)
+                //    {
+                //        assertActivations[batch, act] = bias[act];
+                //    }
+
+                //    Tensor2D<float> inputsT = (Tensor2D<float>)(object)this;
+
+                //    // Perform the matrix multiplication
+                //    for (int act = 0; act < assertActivations.Shape[1]; act++)
+                //    {
+                //        for(int i = 0; i < weights.Shape[0]; i++)
+                //        {
+                //            assertActivations[batch, act] += inputsT[batch, i] * weights[i, act];
+                //        }
+                //    }
+
+                //    // Aply ReLU if needed
+                //    if (applyReLU)
+                //    {
+                //        for (int act = 0; act < assertActivations.Shape[1]; act++)
+                //        {
+                //            assertActivations[batch, act] = MathF.Max(0, assertActivations[batch, act]);
+                //        }
+                //    }
+                //}
+
+                //for(int batch = 0; batch < Shape[0]; batch++)
+                //{
+                //    for( int act = 0; act < assertActivations.Shape[1]; act++)
+                //    {
+                //        Debug.Assert(MathF.Abs(assertActivations[batch, act] - activations[batch, act]) < 0.01, "Hardware accelerated result does not match expected activations.");
+                //    }
+                //}
+                #endregion
+#endif
+
                 return;
             }
 
-            throw new NotImplementedException(); // Not implemented without using hardware acceleration because very slow...
+            throw new NotImplementedException();
         }
 
         public override Tensor<T> DynamicCast(int[] shape)
@@ -113,17 +162,21 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
                 for (int batch = 0; batch < this.Shape[0]; batch++)
                 {
                     var enumerable = EnumerateValuesInBatch(batch);
-                    var enumerator = function(enumerable).GetEnumerator();
+                    enumerable = function(enumerable);
 
-                    for (int i = 0; i < Shape[1]; i++)
+                    int i = 0;
+                    foreach (var v in enumerable)
                     {
-                        this[batch, i] = enumerator.Current;
-                        enumerator.MoveNext();
+                        this[batch, i] = v;
+                        i++;
                     }
+
                 }
             }
-
-            await base.ApplyFunction(function);
+            else
+            {
+                await base.ApplyFunction(function);
+            }
         }
     }
 }
