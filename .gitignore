@@ -38,3 +38,5 @@
 /SparseNeuralNetworkInferenceEngine.Model/obj
 /SparseNeuralNetworkInferenceEngine.Model.Tests/bin/Debug/net10.0
 /SparseNeuralNetworkInferenceEngine.Model.Tests/obj
+/SparseNeuralNetworkInferenceEngine.Example.MNISTWebserver/bin/Debug/net10.0
+/SparseNeuralNetworkInferenceEngine.Example.MNISTWebserver/obj
