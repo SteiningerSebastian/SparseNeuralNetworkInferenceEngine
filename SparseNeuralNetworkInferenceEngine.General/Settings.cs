@@ -4,7 +4,7 @@ using System.Text;
 
 namespace SparseNeuralNetworkInferenceEngine.General
 {
-    public class Settings
+    public record struct Settings
     {
         /// <summary>
         /// The size of the cache lines.

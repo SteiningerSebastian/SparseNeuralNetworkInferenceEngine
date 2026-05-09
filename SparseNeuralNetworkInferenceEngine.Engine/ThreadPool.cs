@@ -1,24 +1,24 @@
 ﻿using SparseNeuralNetworkInferenceEngine.General;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading.Channels;
 
 namespace SparseNeuralNetworkInferenceEngine.Engine
 {
-    public class ThreadPool : IThreadPool, IDisposable
+    public unsafe sealed class ThreadPool : IThreadPool, IDisposable
     {
-        protected record struct WorkItem
+        private unsafe struct WorkItem
         {
-            public Func<int, CancellationToken, object?> Func { get; init; }
-            public Action<object?> Done { get; init; }
-            public Action Canceled { get; init; }
-            public CancellationToken CancelationToken { get; init; }
+            public delegate* managed<int, void*, void> Func { get; init; }
+            public TaskCompletionSource TaskCompletionSource { get; init; }
+            public void* Data { get; init; }
 
-            public WorkItem(Func<int, CancellationToken, object?> func, Action<object?> done, Action canceled, CancellationToken ct)
+            public WorkItem(delegate* managed<int, void*, void> func, TaskCompletionSource tcs, void* data)
             {
                 Func = func;
-                Done = done;
-                CancelationToken = ct;
-                Canceled = canceled;
+                TaskCompletionSource = tcs;
+                Data = data;
             }
         }
 
@@ -33,22 +33,22 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
         /// <summary>
         /// The threads used to execute the Scheduled work.
         /// </summary>
-        protected IList<Thread> threads;
+        private IList<Thread> threads;
 
         /// <summary>
         /// A semaphore to coordinate the tasks.
         /// </summary>
-        protected SemaphoreSlim semaphore;
+        private SemaphoreSlim semaphore;
 
         /// <summary>
         /// A queue of work items to execute.
         /// </summary>
-        protected ConcurrentQueue<WorkItem> workItems = new();
+        private ConcurrentQueue<WorkItem> workItems = new();
 
         /// <summary>
         /// The cancelationTokenSource to be canceled when disposed.
         /// </summary>
-        protected CancellationTokenSource cts;
+        private CancellationTokenSource cts;
 
         /// <summary>
         /// Creating a new ThreadPool that can be used to shedule work
@@ -84,33 +84,15 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
             }
         }
 
-        /// <inheritdoc/>
-        public Task<K>? Schedule<K>(Func<int, CancellationToken, K> func, CancellationToken ct = default)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe Task? Schedule(delegate* managed<int, void*, void> func, void* data)
         {
             if (workItems.Count >= Capacity)
                 return null;
-
-            ct = CancellationTokenSource.CreateLinkedTokenSource(ct, cts.Token).Token;
-
-            var tcs = new TaskCompletionSource<K>();
-
-            workItems.Enqueue(new((i, ct) => (object?)func(i, ct)!, (object? o) => tcs.SetResult((K)o!), () => tcs.SetCanceled(ct), ct));
-
-            semaphore.Release();
-
-            return tcs.Task;
-        }
-
-        public Task? Schedule(Action<int, CancellationToken> func, CancellationToken ct = default)
-        {
-            if (workItems.Count >= Capacity)
-                return null;
-
-            ct = CancellationTokenSource.CreateLinkedTokenSource(ct, cts.Token).Token;
 
             var tcs = new TaskCompletionSource();
 
-            workItems.Enqueue(new((i, ct) => { func(i, ct); return null; }, (object? o) => tcs.SetResult(), () => tcs.SetCanceled(ct), ct));
+            workItems.Enqueue(new(func, tcs, data));
 
             semaphore.Release();
 
@@ -121,32 +103,31 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
         /// The threads entry point.
         /// </summary>
         /// <param name="threadId">The thread id that calls this Thread</param>
-        protected void BeginThread(int threadId, CancellationToken ct)
+        private void BeginThread(int threadId, CancellationToken ct)
         {
             CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(ct, this.cts.Token);
             ct = cts.Token;
             while (!ct.IsCancellationRequested)
             {
-                // Waiting for work to be scheduled.
-                semaphore.Wait(ct);
-
-                if (ct.IsCancellationRequested)
-                    break;
-
-                // Try to retrieve a work item to work on.
-                if (workItems.TryDequeue(out var workItem))
+                for (int i = 0; i < 100; i++)
                 {
-                    if (workItem.CancelationToken.IsCancellationRequested)
+                    // Try to retrieve a work item to work on.
+                    if (workItems.TryDequeue(out var workItem))
                     {
-                        workItem.Canceled();
-                        continue;
+                        workItem.Func(threadId, workItem.Data);
+
+                        // Work has been completed, set the result for the associated task.
+                        workItem.TaskCompletionSource.SetResult();
                     }
-
-                    object? result = workItem.Func.Invoke(threadId, workItem.CancelationToken);
-
-                    // Work has been completed, set the result for the associated task.
-                    workItem.Done(result);
+                    else
+                    {
+                        // No work item was found, wait a bit and try again.
+                        // Up to 1ms wait time, then yield the thread to the OS scheduler to prevent busy waiting.
+                        Thread.SpinWait(10);
+                    }
                 }
+
+                semaphore.Wait(ct);
             }
         }
 

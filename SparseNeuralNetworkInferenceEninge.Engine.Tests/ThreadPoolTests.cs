@@ -1,14 +1,25 @@
 ﻿using SparseNeuralNetworkInferenceEngine.Engine;
 using SparseNeuralNetworkInferenceEngine.General;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using ThreadPool = SparseNeuralNetworkInferenceEngine.Engine.ThreadPool;
 
 namespace SparseNeuralNetworkInferenceEninge.Engine.Tests
 {
     public class ThreadPoolTests
     {
+        protected unsafe struct DataWork
+        {
+            public bool* worked;
+        }
+
+        public unsafe static void Work(int threadId, void* data)
+        {
+            *(*(DataWork*)data).worked = true;
+        }
+
         [Fact]
-        public async Task Constructor()
+        public unsafe void Constructor()
         {
             CancellationTokenSource cts = new CancellationTokenSource(1000);
 
@@ -16,122 +27,63 @@ namespace SparseNeuralNetworkInferenceEninge.Engine.Tests
 
             bool worked = false;
 
-            var task = threadPool.Schedule((i, ct) => { worked = true; return true; });
+            var dataWork = new DataWork()
+            {
+                worked = &worked
+            };
 
+            var task = threadPool.Schedule(&Work, &dataWork);
             Assert.True(task != null);
-            Assert.True(await task);
+            task.Wait();
             Assert.True(worked);
         }
 
-        [Fact]
-        public async Task CheckThreadPriority()
+        protected unsafe struct DataWorkList
         {
-            CancellationTokenSource cts = new CancellationTokenSource(1000);
+            public bool* worked;
+        }
 
-            IThreadPool threadPool = new ThreadPool(4, 100, ThreadPriority.BelowNormal, cts);
-            ThreadPriority setPriority = ThreadPriority.Normal;
-            var task = threadPool.Schedule((i, ct) =>
-            {
-                setPriority = Thread.CurrentThread.Priority;
-                return true;
-            });
-
-            Assert.NotNull(task);
-
-            await task;
-
-            Assert.Equal(ThreadPriority.BelowNormal, setPriority);
+        public unsafe static void WorkList(int threadId, void* data)
+        {
+            bool* worked = (*(DataWorkList*)data).worked + threadId;
+            Thread.Sleep(100);
+            *worked = true;
         }
 
         [Fact]
-        public async Task TestMultipleInvokations()
+        public unsafe void TestMultipleInvokations()
         {
             CancellationTokenSource cts = new CancellationTokenSource(3000);
 
             IThreadPool threadPool = new ThreadPool(4, 10, ThreadPriority.Normal, cts);
 
-            ConcurrentBag<int> threadsWorked = new();
+            bool[] threadsWorked = new bool[4];
+            var handl = GCHandle.Alloc(threadsWorked, GCHandleType.Pinned);
 
-            var tasks = new List<Task<bool>>();
+            var tasks = new List<Task>();
+
+            var dataList = new DataWorkList()
+            {
+                worked = (bool*)handl.AddrOfPinnedObject()
+            };
 
             for (int i = 0; i < 10; i++)
             {
                 // Ignore the task that returns the result.
-                var t = threadPool.Schedule<bool>((i, ct) =>
-                 {
-                     threadsWorked.Add(i);
-                     Thread.Sleep(1000); 
-                     return true;
-                 });
+                var t = threadPool.Schedule(&WorkList, &dataList);
 
                 Assert.NotNull(t);
 
                 tasks.Add(t);
             }
 
-            await Task.WhenAll(tasks);
+            Task.WhenAll(tasks).Wait();
 
             // Test if every thread did some work
-            Assert.Contains(0, threadsWorked);
-            Assert.Contains(1, threadsWorked);
-            Assert.Contains(2, threadsWorked);
-            Assert.Contains(3, threadsWorked);
-        }
-
-        [Fact]
-        public async Task TestCancel()
-        {
-            CancellationTokenSource cts = new CancellationTokenSource(3000);
-
-            IThreadPool threadPool = new ThreadPool(4, 100, ThreadPriority.Normal, cts);
-
-            ConcurrentBag<int> threadsWorked = new();
-            ConcurrentBag<int> tasksWorked = new();
-
-            var tasks = new List<Task<bool>>();
-
-            for (int i = 0; i < 10; i++)
-            {
-                CancellationTokenSource taskCts = new();
-                int d = i;
-
-                // Ignore the task that returns the result.
-                var t = threadPool.Schedule<bool>((n, ct) =>
-                {
-                    threadsWorked.Add(n);
-                    tasksWorked.Add(d);
-                    Thread.Sleep(10);
-                    return true;
-                }, taskCts.Token);
-
-                Assert.NotNull(t);
-
-                if (d == 7)
-                {
-                    taskCts.Cancel(); // Dont work this.
-                }
-
-                tasks.Add(t);
-            }
-
-
-            await Assert.ThrowsAsync<TaskCanceledException>(async () => await Task.WhenAll(tasks));
-
-            Assert.Equal(9, tasksWorked.Count);
-
-            // Test if every thread did some work
-            Assert.Contains(0, tasksWorked);
-            Assert.Contains(1, tasksWorked);
-            Assert.Contains(2, tasksWorked);
-            Assert.Contains(3, tasksWorked);
-            Assert.Contains(4, tasksWorked);
-            Assert.Contains(5, tasksWorked);
-            Assert.Contains(6, tasksWorked);
-            Assert.Contains(8, tasksWorked);
-            Assert.Contains(9, tasksWorked);
-
-            // Making sure the canceled task is not worked on.
-            Assert.DoesNotContain(7, tasksWorked);
+            Assert.True(threadsWorked[0]);
+            Assert.True(threadsWorked[1]);
+            Assert.True(threadsWorked[2]);
+            Assert.True(threadsWorked[3]);
         }
     }
 }

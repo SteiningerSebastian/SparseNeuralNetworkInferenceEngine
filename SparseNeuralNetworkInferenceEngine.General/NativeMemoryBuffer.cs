@@ -4,13 +4,13 @@ using System.Text;
 
 namespace SparseNeuralNetworkInferenceEngine.General
 {
-    public class NativeMemoryBuffer<T> : IDisposable where T: unmanaged
+    public sealed class NativeMemoryBuffer<T> : IDisposable where T: unmanaged
     {
-        protected NativeMemoryOwner<T>? memoryOwner;
+        private NativeMemoryOwner<T>? memoryOwner;
 
-        protected NativeMemoryBufferManager<T> manager;
+        private NativeMemoryBufferManager<T> manager;
 
-        protected int size = 0;
+        private int size = 0;
 
         /// <summary>
         /// The buffer that can be used to store data.

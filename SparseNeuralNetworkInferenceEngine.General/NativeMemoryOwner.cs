@@ -14,7 +14,7 @@ namespace SparseNeuralNetworkInferenceEngine.General
     /// Holds the native memory for the tensors.
     /// </summary>
     /// <typeparam name="T">The type to store.</typeparam>
-    public unsafe class NativeMemoryOwner<T> : MemoryManager<T>, ICloneable where T : unmanaged
+    public sealed unsafe class NativeMemoryOwner<T> : MemoryManager<T>, ICloneable where T : unmanaged
     {
         private readonly void* pointer;
         private readonly nuint length;

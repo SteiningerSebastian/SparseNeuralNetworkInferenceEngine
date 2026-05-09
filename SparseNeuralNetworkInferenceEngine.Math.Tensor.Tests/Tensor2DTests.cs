@@ -6,7 +6,7 @@ using ThreadPool = SparseNeuralNetworkInferenceEngine.Engine.ThreadPool;
 using System.Diagnostics;
 using SparseNeuralNetworkInferenceEngine.General;
 
-namespace Meth.Tensor.Tests
+namespace Math.Tensor.Tests
 {
     public class Tensor2DTests
     {
@@ -260,7 +260,7 @@ namespace Meth.Tensor.Tests
             // Apply ReLu
             for (int i = 0; i < result.Length; i++)
             {
-                result[i] = Math.Max(0, result[i]);
+                result[i] = System.Math.Max(0, result[i]);
             }
 
             return result;
