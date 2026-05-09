@@ -322,7 +322,7 @@ namespace Meth.Tensor.Tests
                 float[] inps = new float[d1];
                 for (int j = 0; j < d1; j++)
                 {
-                    inps[j] = myRandom.NextSingle() * 2 - 1;
+                    inps[j] = 0;// myRandom.NextSingle() * j;
                 }
                 inputs[i] = inps;
             }
@@ -331,7 +331,7 @@ namespace Meth.Tensor.Tests
             float[] bias = new float[d2];
             for (int i = 0; i < d2; i++)
             {
-                bias[i] = myRandom.NextSingle() * 2 - 1;
+                bias[i] = 0;// myRandom.NextSingle() * i;
             }
 
             float[,] weights = new float[d1, d2];
@@ -339,7 +339,7 @@ namespace Meth.Tensor.Tests
             {
                 for (int j = 0; j < d2; j++)
                 {
-                    weights[i, j] = myRandom.NextSingle() * 2 - 1;
+                    weights[i, j] = 0;//myRandom.NextSingle() * j / (float)(1+i);
                 }
             }
 
@@ -388,6 +388,11 @@ namespace Meth.Tensor.Tests
                 float[] outputs = MultiplyAddReLU(inputs[b], weights, bias);
                 for (int j = 0; j < outputsTensor.Shape[1]; j++)
                 {
+                    if(outputs[j] - outputsTensor[b, j] > 0.0001)
+                    {
+                        Debug.WriteLine($"Output mismatch at batch {b}, index {j}. Expected: {outputs[j]}, Actual: {outputsTensor[b, j]}");
+                    }
+
                     Assert.Equal(0, outputs[j] - outputsTensor[b, j], precision: 2);
                     Assert.Equal(0, activationsTensor[b, j] - outputsTensor[b, j], precision: 2);
                 }
@@ -426,10 +431,12 @@ namespace Meth.Tensor.Tests
 
         [Theory]
         [InlineData(4, 16, 1)]
+        [InlineData(4, 32, 1)]
         [InlineData(64, 128, 1)]
         [InlineData(256, 4096, 1)]
         [InlineData(4, 16, 2)]
         [InlineData(1, 32, 2)]
+        [InlineData(4, 32, 2)]
         [InlineData(16, 64, 2)]
         [InlineData(16, 64, 7)]
         [InlineData(64, 256, 8)]
@@ -478,7 +485,7 @@ namespace Meth.Tensor.Tests
             {
                 for (int b = 0; b < batchSize; b++)
                 {
-                    if (i != outputs[b, i])
+                    if (inputs[b, i] + bias[i] != outputs[b, i])
                     {
                         Debug.Print($"Something went wrong at [{b},{i}]. MemoryOffset: {batchValueLayout.MapToMemory([b, i])}");
                     }

@@ -9,6 +9,12 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.Engine\SparseNeuralNetworkInferenceEngine.Engine.csproj" />
+	  <ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.General\SparseNeuralNetworkInferenceEngine.General.csproj" />
+	  <ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.HardwareAcceleration\SparseNeuralNetworkInferenceEngine.HardwareAcceleration.csproj" />
+	  <ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.Math.Tensor\SparseNeuralNetworkInferenceEngine.Math.Tensor.csproj" />
+	  <ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.Math\SparseNeuralNetworkInferenceEngine.Math.csproj" />
+	  <ProjectReference Include="..\SparseNeuralNetworkInferenceEngine.Model\SparseNeuralNetworkInferenceEngine.Model.csproj" />
 	</ItemGroup>
 
 </Project>

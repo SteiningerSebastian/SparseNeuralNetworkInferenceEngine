@@ -82,7 +82,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
                 throw new NotSupportedException("Only single or double precision floating point numbers are accepted.");
             }
 
-            LayoutMapper = new RowMajorTensorMemoryLayout(shape);
+            LayoutMapper = null!;
         }
 
         /// <summary>

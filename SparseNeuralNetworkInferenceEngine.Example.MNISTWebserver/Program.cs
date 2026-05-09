@@ -20,9 +20,9 @@ const int INPUT_SIZE = 784;
 
 ModelSequential model = new ModelSequential([
     new InputLayer([BATCH_SIZE, INPUT_SIZE]),
-                new DenseLayerAvx(304, threadPool.NumberOfThreads),
-                new DenseLayerAvx(112, threadPool.NumberOfThreads),
-                new DenseLayerAvx(16, threadPool.NumberOfThreads, false),
+                new DenseLayerAvx(304, threadPool.NumberOfThreads, accelerator),
+                new DenseLayerAvx(112, threadPool.NumberOfThreads, accelerator),
+                new DenseLayerAvx(16, threadPool.NumberOfThreads, accelerator, false),
                 new ActivationLayer(new SoftMaxActivationFunction(10)),
                 new OutputLayer(10)
     ], engine);

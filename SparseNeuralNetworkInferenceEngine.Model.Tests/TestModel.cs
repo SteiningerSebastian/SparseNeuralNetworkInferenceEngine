@@ -22,9 +22,9 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
 
             IModel model = new ModelSequential([
                 new InputLayer([32, 784]),
-                new DenseLayerAvx(304,threadPool.NumberOfThreads),
-                new DenseLayerAvx(96, threadPool.NumberOfThreads),
-                new DenseLayerAvx(16, threadPool.NumberOfThreads, false),
+                new DenseLayerAvx(304,threadPool.NumberOfThreads, accelerator),
+                new DenseLayerAvx(96, threadPool.NumberOfThreads, accelerator),
+                new DenseLayerAvx(16, threadPool.NumberOfThreads, accelerator, false),
                 new ActivationLayer(new SoftMaxActivationFunction(10)),
                 new OutputLayer(10)
                 ], engine);
@@ -51,9 +51,9 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
 
             ModelSequential model = new ModelSequential([
                 new InputLayer([BATCH_SIZE, INPUT_SIZE]),
-                new DenseLayerAvx(304,threadPool.NumberOfThreads),
-                new DenseLayerAvx(112, threadPool.NumberOfThreads),
-                new DenseLayerAvx(16, threadPool.NumberOfThreads, false),
+                new DenseLayerAvx(304,threadPool.NumberOfThreads, accelerator),
+                new DenseLayerAvx(112, threadPool.NumberOfThreads, accelerator),
+                new DenseLayerAvx(16, threadPool.NumberOfThreads, accelerator, false),
                 new ActivationLayer(new SoftMaxActivationFunction(10)),
                 new OutputLayer(10)
                 ], engine);
@@ -61,9 +61,9 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
             // Compile the model
             model.Compile();
 
-            var par = await BinaryLoader.ReadFileToFloatEnumerableAsync("E:/IUBScSparseNeuralNetworkInferenceEngine/Models/MNIST304_112_10_Sparsity_59/model_parameters.bin")!;
+            var par = await BinaryLoader.ReadFileToFloatEnumerableAsync("E:/IUBScSNNIE/Models/MNIST304_112_10_Sparsity_59/model_parameters.bin")!;
 
-            await model.LoadAsync("E:/IUBScSparseNeuralNetworkInferenceEngine/Models/MNIST304_112_10_Sparsity_59/model_parameters.bin");
+            await model.LoadAsync("E:/IUBScSNNIE/Models/MNIST304_112_10_Sparsity_59/model_parameters.bin");
 
             float[] floats = model.Store();
 
@@ -81,7 +81,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
         [Fact]
         public async Task BasicMNISTInferenceTest()
         {
-            IThreadPool threadPool = new ThreadPool(Environment.ProcessorCount, 1024);
+            IThreadPool threadPool = new ThreadPool(1/*Environment.ProcessorCount*/, 1024);
             IHardwareAccelerator accelerator = new AVXHardwareAccelerator(threadPool);
             IInferenceEngine engine = new InferenceEngine(accelerator);
 
@@ -90,9 +90,9 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
 
             ModelSequential model = new ModelSequential([
                 new InputLayer([BATCH_SIZE, INPUT_SIZE]),
-                new DenseLayerAvx(304, threadPool.NumberOfThreads),
-                new DenseLayerAvx(112, threadPool.NumberOfThreads),
-                new DenseLayerAvx(16, threadPool.NumberOfThreads, false),
+                new DenseLayerAvx(304, threadPool.NumberOfThreads, accelerator),
+                new DenseLayerAvx(112, threadPool.NumberOfThreads, accelerator),
+                new DenseLayerAvx(16, threadPool.NumberOfThreads, accelerator, false),
                 new ActivationLayer(new SoftMaxActivationFunction(10)),
                 new OutputLayer(10)
                 ], engine);
@@ -100,9 +100,9 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
             // Compile the model
             model.Compile();
 
-            await model.LoadAsync("E:/IUBScSparseNeuralNetworkInferenceEngine/Models/MNIST304_112_10_Sparsity_59/model_parameters.bin");
+            await model.LoadAsync("E:/IUBScSNNIE/Models/MNIST304_112_10_Sparsity_59/model_parameters.bin");
 
-            float[] inps = await BinaryLoader.ReadFileToFloatEnumerableAsync("E:/IUBScSparseNeuralNetworkInferenceEngine/Models/MNIST304_112_10_Sparsity_59/x_test_flattened.bin");
+            float[] inps = await BinaryLoader.ReadFileToFloatEnumerableAsync("E:/IUBScSNNIE/Models/MNIST304_112_10_Sparsity_59/x_test_flattened.bin");
 
             var inputLayout = new BatchValueTensorMemoryLayout(BATCH_SIZE, INPUT_SIZE);
             Tensor2D<float> inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(inputLayout, BATCH_SIZE, INPUT_SIZE);
@@ -121,7 +121,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
                 results[batch]= arrRes;
             }
 
-            float[] expected = await BinaryLoader.ReadFileToFloatEnumerableAsync("E:/IUBScSparseNeuralNetworkInferenceEngine/Models/MNIST304_112_10_Sparsity_59/y_test_predictions.bin");
+            float[] expected = await BinaryLoader.ReadFileToFloatEnumerableAsync("E:/IUBScSNNIE/Models/MNIST304_112_10_Sparsity_59/y_test_predictions.bin");
 
             for (int batch = 0; batch < res.Shape[0]; batch++)
             {

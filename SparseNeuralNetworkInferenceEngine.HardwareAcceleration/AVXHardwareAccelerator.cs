@@ -35,6 +35,26 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             return new AVXHardwareAccelerator(threadPool);
         }
 
+        public void PrepareForInference(int[] shape)
+        {
+            // Nothing to prepare for inference if the shape is empty.
+            if (shape.Length == 0)
+                return;
+
+            int length = 1;
+            foreach (int dim in shape)
+            {
+                length *= dim;
+            }
+
+
+            // For each thread we need a buffer of the size of the activations to cache the intermediary results.
+            length *= threadPool.NumberOfThreads;
+
+            // Preallocate a buffer of the required size to avoid overhead during inference.
+            bufferManager.GetBuffer(length, sizeof(float));
+        }
+
         /// <inheritdoc/>
         public Task AddAsync(Span<float> addend1, Span<float> addend2)
         {
@@ -234,8 +254,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
         {
             List<Task> tasks = new();
 
-            // Distribute the work evenly 
-
+            // Distribute the work evenly   
             int hKernelsPerThread = hKernels / threadPool.NumberOfThreads;
             int hKernelsRemaing = hKernels % threadPool.NumberOfThreads;
 
@@ -306,6 +325,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
 
         /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public Task FusedMultiplyAdd(int batches, int[] weightsShape, Span<float> inputs, Span<float> weights, Span<float> bias, NativeMemoryOwner<float> activations, bool applyReLU = true, CancellationToken ct = default)
         {
             Debug.Assert(inputs.Length % 16 == 0 && weights.Length % 16 == 0 && bias.Length % 16 == 0, "The shape of the tensors must be divisible by 16");
@@ -316,10 +336,8 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             int vKernels = weightsShape[0] / KERNEL_SIZE_IN_FLOATS;
             int hKernels = weightsShape[1] / KERNEL_SIZE_IN_FLOATS;
 
+            var tasks = new List<Task>(threadPool.NumberOfThreads);
             Task task;
-            List<NativeMemoryBuffer<float>> activationResults = new();
-            var tasks = new List<Task>();
-
             unsafe
             {
                 // Convert the spans to points so we can work with them for the hardware accelerated caclulations
@@ -335,10 +353,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
                 int elementsInVector = Vector<float>.Count;
 
-                // Initializing the result tensor with the bias.
-                var copyBiasTask = CopyBiasToActivations(batches, hKernels, ptrBias, ptrActivations, ct);
-
-                tasks.Add(copyBiasTask);
 
                 // Distribute the work evenly 
                 int vKernelsPerPartition = vKernels / threadPool.NumberOfThreads;
@@ -348,6 +362,11 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
                 int offsetWeights = 0;
                 int offsetInputs = 0;
+
+                var threadedResults = bufferManager.GetBuffer(activations.Data.Length * threadPool.NumberOfThreads, sizeof(float));
+                var threadedResultsBuffer = threadedResults.Buffer.Slice(0, activations.Data.Length * partitions);
+
+                var addBarrier = new Barrier(partitions);
 
                 // For each partition produce the intermediary result of x*W
                 for (int i = 0; i < partitions; i += 1)
@@ -359,25 +378,24 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         vKernelsRemaining--;
                     }
 
-                    // Buffer for the thread to work with.
-                    var buffer = bufferManager.GetBuffer(activations.Data.Length, sizeof(float));
-
-                    activationResults.Add(buffer);
+                    var rawBuffer = threadedResultsBuffer;
 
                     // Get a pointer to said buffer.
-                    ref float rBuffer = ref MemoryMarshal.GetReference(buffer.Buffer);
-                    float* ptrBuffer = (float*)Unsafe.AsPointer(ref rBuffer);
+                    ref float rRawBuffer = ref MemoryMarshal.GetReference(rawBuffer);
+                    float* ptrRawBuffer = (float*)Unsafe.AsPointer(ref rRawBuffer);
+                    float* ptrBuffer = ptrRawBuffer + i * activations.Data.Length;
 
                     // Calculate the pointers this work-item needs.
                     float* currentWeightsPtr = ptrWeights + offsetWeights;
                     float* currentInputsPtr = ptrInputs + offsetInputs;
                     float* currentBufferPtr = ptrBuffer;
 
+                    int partitionId = i;
+                    int hKernelsPerPartition = hKernels / threadPool.NumberOfThreads;
+                    int hKernelsRemaining = hKernels % threadPool.NumberOfThreads;
+
                     var th = threadPool.Schedule((_, ct) =>
                     {
-                        buffer.Clear(); // For performance reason the buffer is created uninitialized, so clear it.
-                        var zeros = Vector.Create<float>(0);
-
                         float* coloumnStartInputsPtr = currentInputsPtr;
 
                         for (int c = 0; c < hKernels; c++)
@@ -404,10 +422,20 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                         var vcInputs = Vector.LoadAligned(currentInputsPtr);
 
                                         // Check if whole kernel is zero => skip sparse activations.
-                                        if (!Vector.EqualsAll(zeros, vcInputs))
+                                        if (!Vector.EqualsAll(Vector<float>.Zero, vcInputs))
                                         {
 
-                                            Vector<float> addents = Vector.LoadAligned(currentBufferPtr);
+                                            Vector<float> addents;
+                                            // For the first row we need to initialize the buffer with zero, for the subsequent rows we must load it.
+                                            // TODO This could be unrolled but the JIT should be able to handle it. -> Check performance and only unroll if it is a bottleneck.
+                                            if (r == 0)
+                                            {
+                                                addents = Vector<float>.Zero;
+                                            }
+                                            else
+                                            {
+                                                addents = Vector.LoadAligned(currentBufferPtr);
+                                            }
 
                                             for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
                                             {
@@ -426,6 +454,11 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                         }
                                         else
                                         {
+                                            if (r == 0)
+                                            {
+                                                Vector.Store(Vector<float>.Zero, currentBufferPtr);
+                                            }
+
                                             currentWeightsPtr += KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
                                             currentInputsPtr += KERNEL_SIZE_IN_FLOATS;
                                         }
@@ -437,10 +470,23 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                         var vcInputs2 = Vector.LoadAligned(currentInputsPtr + Vector<float>.Count);
 
                                         // Check if whole kernel is zero => skip sparse activations.
-                                        if (!(Vector.EqualsAll(zeros, vcInputs1) && Vector.EqualsAll(zeros, vcInputs2)))
+                                        if (!(Vector.EqualsAll(Vector<float>.Zero, vcInputs1) && Vector.EqualsAll(Vector<float>.Zero, vcInputs2)))
                                         {
-                                            Vector<float> addents1 = Vector.LoadAligned(currentBufferPtr);
-                                            Vector<float> addents2 = Vector.LoadAligned(currentBufferPtr + Vector<float>.Count);
+                                            Vector<float> addents1;
+                                            Vector<float> addents2;
+
+                                            // For the first row we need to initialize the buffer with zero, for the subsequent rows we must load it.
+                                            // TODO This could be unrolled but the JIT should be able to handle it. -> Check performance and only unroll if it is a bottleneck.
+                                            if (r == 0)
+                                            {
+                                                addents1 = Vector<float>.Zero;
+                                                addents2 = Vector<float>.Zero;
+                                            }
+                                            else
+                                            {
+                                                addents1 = Vector.LoadAligned(currentBufferPtr);
+                                                addents2 = Vector.LoadAligned(currentBufferPtr + Vector<float>.Count);
+                                            }
 
                                             for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
                                             {
@@ -462,6 +508,12 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                         }
                                         else
                                         {
+                                            if(r == 0)
+                                            {
+                                                Vector.Store(Vector<float>.Zero, currentBufferPtr);
+                                                Vector.Store(Vector<float>.Zero, currentBufferPtr + Vector<float>.Count);
+                                            }
+
                                             currentWeightsPtr += KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
                                             currentInputsPtr += KERNEL_SIZE_IN_FLOATS;
                                         }
@@ -470,6 +522,110 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                                     // Move the buffer we work on.
                                     currentBufferPtr += KERNEL_SIZE_IN_FLOATS;
                                 }
+                            }
+                        }
+
+                        // Check if all threads have cleared the barrier and the buffer is ready to be added together.
+                        addBarrier.SignalAndWait(ct);
+
+                        int cols = hKernelsPerPartition;
+                        // Distribute the remaining coloumns to the first few partitions.
+                        if (partitionId < hKernelsRemaining)
+                            cols++;
+
+                        int offset = partitionId * hKernelsPerPartition * KERNEL_SIZE_IN_FLOATS +
+                                     (partitionId < hKernelsRemaining ? partitionId : hKernelsRemaining) * KERNEL_SIZE_IN_FLOATS;
+
+                        currentBufferPtr = ptrRawBuffer + offset * batches;
+
+                        // Offset between intermediary results in the buffer
+                        int bufferOffset = batches * hKernels * KERNEL_SIZE_IN_FLOATS;
+
+                        float* startBiasPtr = ptrBias + offset;
+
+                        // If there are no coloumns to process we can skip this step and let the other threads do their work.
+                        if (cols != 0)
+                        {
+                            float* startActivationPtr = ptrActivations + offset * batches;
+                            // For the result of each partition add the intermediar results togehter.
+                            for (int p = 0; p < partitions; p++)
+                            {
+                                float* startBufferPtr = currentBufferPtr;
+                                float* currentActivationPtr = startActivationPtr;
+                                float* currentBiasPtr = startBiasPtr;
+
+                                for (int c = 0; c < cols; c++)
+                                {
+                                    for (int b = 0; b < batches; b++)
+                                    {
+                                        if (Vector<float>.Count == KERNEL_SIZE_IN_FLOATS)
+                                        {
+                                            Vector<float> addent;
+                                            Vector<float> buf;
+
+                                            // TODO This could be unrolled but the JIT should be able to handle it. -> Check performance and only unroll if it is a bottleneck.
+                                            if (p == 0)
+                                            {
+                                                addent = Vector.LoadAligned(currentBiasPtr);
+                                                buf = Vector.LoadAligned(currentBufferPtr);
+                                            }
+                                            else
+                                            {
+                                                addent = Vector.LoadAligned(currentActivationPtr);
+                                                buf = Vector.LoadAligned(currentBufferPtr);
+                                            }
+
+                                            var res = Vector.Add(buf, addent);
+                                            // TODO This could be unrolled but the JIT should be able to handle it. -> Check performance and only unroll if it is a bottleneck.
+                                            if (applyReLU && p == partitions - 1)
+                                            {
+                                                res = Vector.Max(res, Vector<float>.Zero);
+                                            }
+
+                                            res.StoreAligned(currentActivationPtr);
+                                        }
+                                        else
+                                        {
+                                            Vector<float> addent1;
+                                            Vector<float> addent2;
+                                            Vector<float> buf1;
+                                            Vector<float> buf2;
+
+                                            // TODO This could be unrolled but the JIT should be able to handle it. -> Check performance and only unroll if it is a bottleneck.
+                                            if (p == 0)
+                                            {
+                                                addent1 = Vector.LoadAligned(currentBiasPtr);
+                                                addent2 = Vector.LoadAligned(currentBiasPtr + Vector<float>.Count);
+                                                buf1 = Vector.LoadAligned(currentBufferPtr);
+                                                buf2 = Vector.LoadAligned(currentBufferPtr + Vector<float>.Count);
+                                            }
+                                            else
+                                            {
+                                                addent1 = Vector.LoadAligned(currentActivationPtr);
+                                                addent2 = Vector.LoadAligned(currentActivationPtr + Vector<float>.Count);
+                                                buf1 = Vector.LoadAligned(currentBufferPtr);
+                                                buf2 = Vector.LoadAligned(currentBufferPtr + Vector<float>.Count);
+                                            }
+
+                                            var res1 = Vector.Add(buf1, addent1);
+                                            var res2 = Vector.Add(buf2, addent2);
+                                            
+                                            // TODO This could be unrolled but the JIT should be able to handle it. -> Check performance and only unroll if it is a bottleneck.
+                                            if (applyReLU && p == partitions - 1)
+                                            {
+                                                res1 = Vector.Max(res1, Vector<float>.Zero);
+                                                res2 = Vector.Max(res2, Vector<float>.Zero);
+                                            }
+
+                                            res1.StoreAligned(currentActivationPtr);
+                                            res2.StoreAligned(currentActivationPtr + Vector<float>.Count);
+                                        }
+                                        currentBufferPtr += KERNEL_SIZE_IN_FLOATS;
+                                        currentActivationPtr += KERNEL_SIZE_IN_FLOATS;
+                                    }
+                                    currentBiasPtr += KERNEL_SIZE_IN_FLOATS;
+                                }
+                                currentBufferPtr = startBufferPtr + bufferOffset; // Move to the next partition in the buffer.
                             }
                         }
                     });
@@ -482,37 +638,13 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                     offsetWeights += vHeightInPartition * hKernels * KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
                     offsetInputs += vHeightInPartition * KERNEL_SIZE_IN_FLOATS * batches;
                 }
+
+                // Making sure we dispose the buffer after all threads have completed their work.
+                task = Task.WhenAll(tasks).ContinueWith(_ => threadedResults.Dispose());
             }
-
-            // Sum the individual results of each thread.
-            task = Task.WhenAll(tasks);
-            for (int i = 1; i < activationResults.Count; i++)
-            {
-                int j = i;
-                task = task.ContinueWith((_) =>
-                {
-                    var t = AddAsync(activationResults[0].Buffer, activationResults[j].Buffer);
-
-                    if (t is null)
-                        throw new HardwareAccelerationException("Unable to perform operation, work-queue overflow");
-
-                    return t.ContinueWith((_) => { activationResults[j].Dispose(); });// Don't need the buffer anymore so dispose.
-                }).Unwrap();
-            }
-
-            // Now add them to the result (where the bias is already there)
-            task = task.ContinueWith((_) =>
-            {
-                // here we add the buffers to the activations data and apply the relu function to it. max(0, x)
-                var t = applyReLU ? AddReLUAsync(activations.Data, activationResults[0].Buffer) : AddAsync(activations.Data, activationResults[0].Buffer);
-
-                if (t is null)
-                    throw new HardwareAccelerationException("Unable to perform operation, work-queue overflow");
-
-                return t.ContinueWith((_) => { activationResults[0].Dispose(); }); //Don't need this buffer anymore so dispose.
-            }).Unwrap();
 
             return task;
+            ;
         }
     }
 }

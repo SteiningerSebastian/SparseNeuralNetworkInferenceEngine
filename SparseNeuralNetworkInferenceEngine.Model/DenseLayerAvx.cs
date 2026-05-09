@@ -14,11 +14,13 @@ namespace SparseNeuralNetworkInferenceEngine.Model
         protected int threadCount;
         protected bool useReLU;
 
+        protected IHardwareAccelerator hardwareAccelerator;
+
         /// <summary>
         /// Creates a new Dense layer.
         /// </summary>
         /// <param name="size">The number of neurons in this layer.</param>
-        public DenseLayerAvx(int size, int threadCount, bool useReLU = true)
+        public DenseLayerAvx(int size, int threadCount, IHardwareAccelerator accelerator, bool useReLU = true)
         {
             if (size % (Settings.KERNEL_SIZE / sizeof(float)) != 0)
             {
@@ -28,6 +30,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model
             this.size = size;
             this.threadCount = threadCount;
             this.useReLU = useReLU;
+            this.hardwareAccelerator = accelerator;
         }
 
         /// <inheritdoc/>
@@ -44,6 +47,8 @@ namespace SparseNeuralNetworkInferenceEngine.Model
             bias = engine.AllocateUninitializedAlignedTensor<Tensor1D<float>, float>(size);
             var batchValueLayout = new BatchValueTensorMemoryLayout(batchSize, size);
             activation = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(batchValueLayout, [batchSize, size]);
+
+            hardwareAccelerator.PrepareForInference([batchSize, size]);
 
             return [batchSize, size];
         }
@@ -69,7 +74,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model
         /// <returns>An enumerable using the enumerator.</returns>
         protected IEnumerable<float> EnumeratorToEnumerable(IEnumerator<float> enumerator)
         {
-            while(enumerator.MoveNext())
+            while (enumerator.MoveNext())
             {
                 yield return enumerator.Current;
             }

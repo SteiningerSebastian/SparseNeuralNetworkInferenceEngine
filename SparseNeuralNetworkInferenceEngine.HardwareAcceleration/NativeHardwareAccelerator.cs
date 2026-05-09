@@ -11,5 +11,10 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
         {
             return new NativeHardwareAccelerator();
         }
+
+        public void PrepareForInference(int[] shape)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
