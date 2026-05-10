@@ -41,7 +41,7 @@ var inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(i
 inputs.PopulateWithEnumerable(inps.AsSpan().Slice(0, BATCH_SIZE * INPUT_SIZE).ToArray());
 
 float time = 0;
-for (int i = 1; i < 100000; i++)
+for (int i = 1; i < 3000; i++)
 {
     Stopwatch stopwatch = Stopwatch.StartNew();
 
