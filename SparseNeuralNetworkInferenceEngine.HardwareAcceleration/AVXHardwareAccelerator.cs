@@ -120,8 +120,62 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 float* coloumnStartBufferPtr = currentBufferPtr;
                 currentInputsPtr = coloumnStartInputsPtr;
 
+                // Unrolling the first iteration of the loop.
+                {
+                    // these rows are in the same part of the buffer
+                    currentBufferPtr = coloumnStartBufferPtr;
+                    float* kernelStartWeightsPtr = currentWeightsPtr;
+
+                    // This kernel for every batch to keep weights in cahce
+                    for (int b = 0; b < batches; b++)
+                    {
+                        // For the batch start at the beginning of the weights (weights and inputs)
+                        currentWeightsPtr = kernelStartWeightsPtr;
+
+
+                        var vcInputs1 = Vector.LoadAligned(currentInputsPtr);
+                        var vcInputs2 = Vector.LoadAligned(currentInputsPtr + Vector<float>.Count);
+
+                        // Check if whole kernel is zero => skip sparse activations.
+                        if (!(Vector.EqualsAll(Vector<float>.Zero, vcInputs1) && Vector.EqualsAll(Vector<float>.Zero, vcInputs2)))
+                        {
+                            Vector<float> addents1 = Vector<float>.Zero;
+                            Vector<float> addents2 = Vector<float>.Zero;
+
+                            for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
+                            {
+                                Vector<float> vecWeights1 = Vector.LoadAligned(currentWeightsPtr);
+                                Vector<float> vecWeights2 = Vector.LoadAligned(currentWeightsPtr + Vector<float>.Count);
+
+                                float x = *currentInputsPtr; // Load the input from inputs
+                                addents1 = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights1, addents1);
+                                addents2 = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights2, addents2);
+
+                                // move the weigths point to next line.
+                                currentWeightsPtr += KERNEL_SIZE_IN_FLOATS;
+
+                                currentInputsPtr += 1; // Increas inputs pointer for next line
+                            }
+
+                            Vector.Store(addents1, currentBufferPtr); // Store the result back in the buffer.
+                            Vector.Store(addents2, currentBufferPtr + Vector<float>.Count); // Store the result back in the buffer.
+                        }
+                        else
+                        {
+                            Vector.Store(Vector<float>.Zero, currentBufferPtr);
+                            Vector.Store(Vector<float>.Zero, currentBufferPtr + Vector<float>.Count);
+
+                            currentWeightsPtr += KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
+                            currentInputsPtr += KERNEL_SIZE_IN_FLOATS;
+                        }
+
+                        // Move the buffer we work on.
+                        currentBufferPtr += KERNEL_SIZE_IN_FLOATS;
+                    }
+                }
+
                 // The amount of rows we need to compute before moving on the the next coloumn
-                for (int r = 0; r < vHeightInPartition; r += 1)
+                for (int r = 1; r < vHeightInPartition; r += 1)
                 {
                     // these rows are in the same part of the buffer
                     currentBufferPtr = coloumnStartBufferPtr;
@@ -141,21 +195,8 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         // Check if whole kernel is zero => skip sparse activations.
                         if (!(Vector.EqualsAll(Vector<float>.Zero, vcInputs1) && Vector.EqualsAll(Vector<float>.Zero, vcInputs2)))
                         {
-                            Vector<float> addents1;
-                            Vector<float> addents2;
-
-                            // For the first row we need to initialize the buffer with zero, for the subsequent rows we must load it.
-                            // TODO This could be unrolled but the JIT should be able to handle it. -> Check performance and only unroll if it is a bottleneck.
-                            if (r == 0)
-                            {
-                                addents1 = Vector<float>.Zero;
-                                addents2 = Vector<float>.Zero;
-                            }
-                            else
-                            {
-                                addents1 = Vector.LoadAligned(currentBufferPtr);
-                                addents2 = Vector.LoadAligned(currentBufferPtr + Vector<float>.Count);
-                            }
+                            Vector<float> addents1 = Vector.LoadAligned(currentBufferPtr);
+                            Vector<float> addents2 = Vector.LoadAligned(currentBufferPtr + Vector<float>.Count);
 
                             for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
                             {
@@ -394,12 +435,59 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 float* coloumnStartBufferPtr = currentBufferPtr;
                 currentInputsPtr = coloumnStartInputsPtr;
 
-                // The amount of rows we need to compute before moving on the the next coloumn
-                for (int r = 0; r < vHeightInPartition; r += 1)
+                // The first iteration unrolled.
                 {
                     // these rows are in the same part of the buffer
                     currentBufferPtr = coloumnStartBufferPtr;
+                    float* kernelStartWeightsPtr = currentWeightsPtr;
 
+                    // This kernel for every batch to keep weights in cahce
+                    for (int b = 0; b < batches; b++)
+                    {
+                        // For the batch start at the beginning of the weights (weights and inputs)
+                        currentWeightsPtr = kernelStartWeightsPtr;
+
+
+                        var vcInputs = Vector.LoadAligned(currentInputsPtr);
+
+                        // Check if whole kernel is zero => skip sparse activations.
+                        if (!Vector.EqualsAll(Vector<float>.Zero, vcInputs))
+                        {
+                            Vector<float> addents= Vector<float>.Zero;
+
+                            for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
+                            {
+                                Vector<float> vecWeights = Vector.LoadAligned(currentWeightsPtr);
+
+                                float x = *currentInputsPtr; // Load the input from inputs
+                                addents = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights, addents);
+
+                                // move the weigths point to next line.
+                                currentWeightsPtr += KERNEL_SIZE_IN_FLOATS;
+
+                                currentInputsPtr += 1; // Increas inputs pointer for next line
+                            }
+
+                            Vector.Store(addents, currentBufferPtr); // Store the result back in the buffer.
+                        }
+                        else
+                        {
+                            Vector.Store(Vector<float>.Zero, currentBufferPtr);
+
+                            currentWeightsPtr += KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
+                            currentInputsPtr += KERNEL_SIZE_IN_FLOATS;
+                        }
+
+                        // Move the buffer we work on.
+                        currentBufferPtr += KERNEL_SIZE_IN_FLOATS;
+                    }
+                }
+
+                // The amount of rows we need to compute before moving on the the next coloumn
+                for (int r = 1; r < vHeightInPartition; r += 1)
+                {
+                    // these rows are in the same part of the buffer
+                    currentBufferPtr = coloumnStartBufferPtr;
                     float* kernelStartWeightsPtr = currentWeightsPtr;
 
                     // This kernel for every batch to keep weights in cahce
