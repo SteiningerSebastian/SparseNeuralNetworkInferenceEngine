@@ -12,7 +12,7 @@ using ThreadPool = SparseNeuralNetworkInferenceEngine.Engine.ThreadPool;
 
 Console.WriteLine("Hello, World!");
 
-const int BATCH_SIZE = 1024;
+const int BATCH_SIZE = 128;
 
 IThreadPool threadPool = new ThreadPool(Environment.ProcessorCount, 1024, System.Threading.ThreadPriority.Highest);
 IHardwareAccelerator accelerator = new AVXHardwareAccelerator(threadPool);
@@ -41,7 +41,7 @@ var inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(i
 inputs.PopulateWithEnumerable(inps.AsSpan().Slice(0, BATCH_SIZE * INPUT_SIZE).ToArray());
 
 float time = 0;
-for (int i = 1; i < 10000; i++)
+for (int i = 1; i < 100000; i++)
 {
     Stopwatch stopwatch = Stopwatch.StartNew();
 

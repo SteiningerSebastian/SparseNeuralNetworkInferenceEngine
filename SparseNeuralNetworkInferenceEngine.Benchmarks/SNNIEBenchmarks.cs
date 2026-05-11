@@ -23,7 +23,7 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
     [HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.CacheMisses)]
     public class SNNIEBenchmarks
     {
-        const int BATCH_SIZE = 1024;
+        const int BATCH_SIZE = 128;
 
         IModel model;
         Tensor2D<float> inputs;
