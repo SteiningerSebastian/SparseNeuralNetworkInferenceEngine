@@ -46,11 +46,13 @@ for (int i = 1; i < 100000; i++)
     Stopwatch stopwatch = Stopwatch.StartNew();
 
     await model.InvokeAsync(inputs);
-    stopwatch.Stop();
-    time += (1 / (float)i) * (stopwatch.ElapsedMilliseconds - time);
 
-    if (i % 100 == 0)
+    stopwatch.Stop();
+
+    time = time + 1/(float)i*(stopwatch.ElapsedTicks * 1000000 / Stopwatch.Frequency - time);
+
+    if (i % 1000 == 0)
     {
-        Console.WriteLine("Current average time: " + time + " ms");
+        Console.WriteLine("Current average time: " + stopwatch.ElapsedTicks * 1000000/Stopwatch.Frequency + " us");
     }
 }
