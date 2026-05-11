@@ -453,7 +453,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         // Check if whole kernel is zero => skip sparse activations.
                         if (!Vector.EqualsAll(Vector<float>.Zero, vcInputs))
                         {
-                            Vector<float> addents= Vector<float>.Zero;
+                            Vector<float> addents = Vector<float>.Zero;
 
                             for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
                             {
@@ -502,17 +502,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         // Check if whole kernel is zero => skip sparse activations.
                         if (!Vector.EqualsAll(Vector<float>.Zero, vcInputs))
                         {
-                            Vector<float> addents;
-                            // For the first row we need to initialize the buffer with zero, for the subsequent rows we must load it.
-                            // TODO This could be unrolled but the JIT should be able to handle it. -> Check performance and only unroll if it is a bottleneck.
-                            if (r == 0)
-                            {
-                                addents = Vector<float>.Zero;
-                            }
-                            else
-                            {
-                                addents = Vector.LoadAligned(currentBufferPtr);
-                            }
+                            Vector<float> addents = Vector.LoadAligned(currentBufferPtr);
 
                             for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
                             {
@@ -531,10 +521,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         }
                         else
                         {
-                            if (r == 0)
-                            {
-                                Vector.Store(Vector<float>.Zero, currentBufferPtr);
-                            }
+                            Vector.Store(Vector<float>.Zero, currentBufferPtr);
 
                             currentWeightsPtr += KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
                             currentInputsPtr += KERNEL_SIZE_IN_FLOATS;
