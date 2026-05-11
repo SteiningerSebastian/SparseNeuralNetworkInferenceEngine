@@ -41,7 +41,7 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
             };
         }
 
-        //[Benchmark]
+        [Benchmark]
         public void OnnxMNISTDataset()
         {
             var results = session.Run(inputs);
@@ -67,7 +67,7 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
             };
         }
 
-        //[Benchmark]
+        [Benchmark]
         public void OnnxFashionMNISTDataset()
         {
             var results = session.Run(inputs);

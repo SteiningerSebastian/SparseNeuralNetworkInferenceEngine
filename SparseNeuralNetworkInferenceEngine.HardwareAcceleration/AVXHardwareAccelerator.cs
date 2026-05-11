@@ -13,10 +13,38 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 {
-    public class AVXHardwareAccelerator : IHardwareAccelerator, ISparseFusedMultiplyAddReLU
+    public class AVXHardwareAccelerator : IHardwareAccelerator, ISparseFusedMultiplyAddReLU, IDisposable
     {
         protected IThreadPool threadPool;
         protected NativeMemoryBufferManager<float> bufferManager;
+        protected NativeMemoryOwner<SFMAWorkItem> workItemBuffer;
+        protected Barrier barrier;
+        protected GCHandle barrierGcHandle;
+        protected IntPtr barrierHandlePtr;
+
+        [StructLayout(LayoutKind.Explicit, Size = 128)]
+        protected unsafe struct SFMAWorkItem
+        {
+            [FieldOffset(0)] public float* currentInputsPtr;
+            [FieldOffset(8)] public float* currentBufferPtr;
+            [FieldOffset(16)] public float* currentWeightsPtr;
+            [FieldOffset(24)] public float* ptrRawBuffer;
+            [FieldOffset(32)] public float* ptrBias;
+            [FieldOffset(40)] public float* ptrActivations;
+
+            [FieldOffset(48)] public int hKernels;
+            [FieldOffset(52)] public int vHeightInPartition;
+            [FieldOffset(56)] public int batches;
+            [FieldOffset(60)] public int partitionId;
+            [FieldOffset(64)] public int threads;
+            [FieldOffset(68)] public int partitions;
+
+            [FieldOffset(72)] public IntPtr barrier;
+
+            [FieldOffset(80)] public bool applyReLU;
+
+            // Remaining bytes are padding.
+        }
 
         public AVXHardwareAccelerator(IThreadPool threadPool)
         {
@@ -28,6 +56,14 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             {
                 throw new HardwareAccelerationException("This hardware accelerator requieres support for 256bit or 512bit Avx / SIMD!");
             }
+
+            // Preallocate the buffers for the inter-thread communication.
+
+            workItemBuffer = new NativeMemoryOwner<SFMAWorkItem>((nuint)threadPool.NumberOfThreads, (nuint)128, 64);
+
+            barrier = new Barrier(0);
+            barrierGcHandle = GCHandle.Alloc(barrier);
+            barrierHandlePtr = GCHandle.ToIntPtr(barrierGcHandle);
         }
 
         public object Clone()
@@ -66,28 +102,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
 
         const int KERNEL_SIZE_IN_FLOATS = (Settings.KERNEL_SIZE / sizeof(float));
-
-
-        protected unsafe struct SFMAWorkItem
-        {
-            public float* currentInputsPtr;
-            public float* currentBufferPtr;
-            public float* currentWeightsPtr;
-            public float* ptrRawBuffer;
-            public float* ptrBias;
-            public float* ptrActivations;
-
-            public int hKernels;
-            public int vHeightInPartition;
-            public int batches;
-            public int partitionId;
-            public int threads;
-            public int partitions;
-
-            public IntPtr barrier;
-
-            public bool applyReLU;
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public unsafe static void FusedMultiplyAddReLUWorkSequential(int threadId, void* data)
@@ -399,9 +413,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 }
                 #endregion
             }
-
-            // This thread is done so we can free the data allocated for its invocation
-            NativeMemory.Free(data);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -604,7 +615,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                     currentBufferPtr = startBufferPtr + bufferOffset; // Move to the next partition in the buffer.
                 }
 
-
                 // For the result of each partition add the intermediar results togehter.
                 for (int p = 1; p < partitions - 1; p++)
                 {
@@ -683,9 +693,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 }
                 #endregion
             }
-
-            // This thread is done so we can free the data allocated for its invocation
-            NativeMemory.Free(data);
         }
 
         /// <inheritdoc/>
@@ -717,6 +724,8 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
                 int elementsInVector = Vector<float>.Count;
 
+                SFMAWorkItem* workItems = workItemBuffer.Pointer;
+
                 // Distribute the work evenly 
                 int vKernelsPerPartition = vKernels / threadPool.NumberOfThreads;
                 int vKernelsRemaining = vKernels % threadPool.NumberOfThreads;
@@ -729,9 +738,9 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 var threadedResults = bufferManager.GetBuffer(activations.Data.Length * threadPool.NumberOfThreads, sizeof(float));
                 var threadedResultsBuffer = threadedResults.Buffer.Slice(0, activations.Data.Length * partitions);
 
-                Barrier barrier = new Barrier(partitions);
-                GCHandle handleBarrier = GCHandle.Alloc(barrier);
-                IntPtr barrierHandlePtr = GCHandle.ToIntPtr(handleBarrier);
+                if (barrier.ParticipantCount > 0)
+                    barrier.RemoveParticipants(barrier.ParticipantCount);
+                barrier.AddParticipants(partitions);
 
                 // For each partition produce the intermediary result of x*W
                 for (int i = 0; i < partitions; i += 1)
@@ -757,8 +766,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
                     int partitionId = i;
 
-                    var workItem = (SFMAWorkItem*)NativeMemory.Alloc((nuint)sizeof(SFMAWorkItem));
-
+                    var workItem = workItems + i;
                     *workItem = new SFMAWorkItem
                     {
                         currentInputsPtr = currentInputsPtr,
@@ -797,16 +805,18 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                     offsetInputs += vHeightInPartition * KERNEL_SIZE_IN_FLOATS * batches;
                 }
 
-                // Making sure we dispose the buffer after all threads have completed their work.
-                // TODO Think about using method for it to avoid allocation but only happens once so...
                 task = Task.WhenAll(tasks).ContinueWith(_ =>
                 {
                     threadedResults.Dispose();
-                    handleBarrier.Free();
                 });
             }
 
             return task;
+        }
+
+        public void Dispose()
+        {
+            barrierGcHandle.Free(); // Dispose of the no longer needed barrier
         }
     }
 }

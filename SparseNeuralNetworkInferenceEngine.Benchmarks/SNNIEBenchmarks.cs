@@ -66,9 +66,9 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
         }
 
         [Benchmark]
-        public void SparseneuralNetworkInferenceEngineMNISTDataset()
+        public async Task SparseneuralNetworkInferenceEngineMNISTDataset()
         {
-            model.InvokeAsync(inputs).Wait();
+            await model.InvokeAsync(inputs);
         }
 
         [GlobalSetup(Target = nameof(SparseneuralNetworkInferenceEngineMNISTDatasetS34))]
@@ -78,9 +78,9 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
         }
 
         [Benchmark]
-        public void SparseneuralNetworkInferenceEngineMNISTDatasetS34()
+        public async Task SparseneuralNetworkInferenceEngineMNISTDatasetS34()
         {
-            model.InvokeAsync(inputs).Wait();
+            await model.InvokeAsync(inputs);
         }
 
 
@@ -92,9 +92,9 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
         }
 
         [Benchmark]
-        public void SparseneuralNetworkInferenceEngineMNISTDatasetS63()
+        public async Task SparseneuralNetworkInferenceEngineMNISTDatasetS63()
         {
-            model.InvokeAsync(inputs).Wait();
+            await model.InvokeAsync(inputs);
         }
 
 
@@ -136,9 +136,9 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
         }
 
         [Benchmark]
-        public void SparseneuralNetworkInferenceEngineFASHION_MNISTDataset()
+        public async Task SparseneuralNetworkInferenceEngineFASHION_MNISTDataset()
         {
-            model.InvokeAsync(inputs).Wait();
+            await model.InvokeAsync(inputs);
         }
 
 
@@ -150,9 +150,9 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
         }
 
         [Benchmark]
-        public void SparseneuralNetworkInferenceEngineFASHION_MNISTDatasetS76()
+        public async Task SparseneuralNetworkInferenceEngineFASHION_MNISTDatasetS76()
         {
-            model.InvokeAsync(inputs).Wait();
+            await model.InvokeAsync(inputs);
         }
 
 
@@ -164,9 +164,9 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
         }
 
         [Benchmark]
-        public void SparseneuralNetworkInferenceEngineFASHION_MNISTDatasetS91()
+        public async Task SparseneuralNetworkInferenceEngineFASHION_MNISTDatasetS91()
         {
-            model.InvokeAsync(inputs).Wait();
+            await model.InvokeAsync(inputs);
         }
     }
 }
