@@ -109,25 +109,19 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
             ct = cts.Token;
             while (!ct.IsCancellationRequested)
             {
-                for (int i = 0; i < 1000; i++)
+
+                // Try to retrieve a work item to work on.
+                if (workItems.TryDequeue(out var workItem))
                 {
-                    // Try to retrieve a work item to work on.
-                    if (workItems.TryDequeue(out var workItem))
-                    {
-                        workItem.Func(threadId, workItem.Data);
+                    workItem.Func(threadId, workItem.Data);
 
-                        // Work has been completed, set the result for the associated task.
-                        workItem.TaskCompletionSource.SetResult();
-                    }
-                    else
-                    {
-                        // No work item was found, wait a bit and try again.
-                        // Up to 10ms wait time, then yield the thread to the OS scheduler to prevent busy waiting.
-                        Thread.SpinWait(1);
-                    }
+                    // Work has been completed, set the result for the associated task.
+                    workItem.TaskCompletionSource.SetResult();
                 }
-
-                semaphore.Wait(ct);
+                else
+                {
+                    semaphore.Wait(ct);
+                }
             }
         }
 

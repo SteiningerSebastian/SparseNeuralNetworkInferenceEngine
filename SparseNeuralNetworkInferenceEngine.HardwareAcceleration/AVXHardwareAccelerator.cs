@@ -21,6 +21,8 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
         protected Barrier barrier;
         protected GCHandle barrierGcHandle;
         protected IntPtr barrierHandlePtr;
+        protected List<Task> tasks;
+
 
         [StructLayout(LayoutKind.Explicit, Size = 128)]
         protected unsafe struct SFMAWorkItem
@@ -64,6 +66,8 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             barrier = new Barrier(0);
             barrierGcHandle = GCHandle.Alloc(barrier);
             barrierHandlePtr = GCHandle.ToIntPtr(barrierGcHandle);
+
+            tasks = new List<Task>(threadPool.NumberOfThreads);
         }
 
         public object Clone()
@@ -202,7 +206,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         // For the batch start at the beginning of the weights (weights and inputs)
                         currentWeightsPtr = kernelStartWeightsPtr;
 
-
                         var vcInputs1 = Vector.LoadAligned(currentInputsPtr);
                         var vcInputs2 = Vector.LoadAligned(currentInputsPtr + Vector<float>.Count);
 
@@ -232,12 +235,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         }
                         else
                         {
-                            if (r == 0)
-                            {
-                                Vector.Store(Vector<float>.Zero, currentBufferPtr);
-                                Vector.Store(Vector<float>.Zero, currentBufferPtr + Vector<float>.Count);
-                            }
-
                             currentWeightsPtr += KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
                             currentInputsPtr += KERNEL_SIZE_IN_FLOATS;
                         }
@@ -707,7 +704,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             int vKernels = weightsShape[0] / KERNEL_SIZE_IN_FLOATS;
             int hKernels = weightsShape[1] / KERNEL_SIZE_IN_FLOATS;
 
-            var tasks = new List<Task>(threadPool.NumberOfThreads);
             Task task;
             unsafe
             {
@@ -808,6 +804,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 task = Task.WhenAll(tasks).ContinueWith(_ =>
                 {
                     threadedResults.Dispose();
+                    tasks.Clear();
                 });
             }
 
