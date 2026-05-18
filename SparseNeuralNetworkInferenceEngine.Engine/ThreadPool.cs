@@ -8,11 +8,21 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
 {
     public unsafe sealed class ThreadPool : IThreadPool, IDisposable
     {
+        // Inspired by https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadaffinitymask
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr SetThreadAffinityMask(IntPtr hThread, IntPtr dwThreadAffinityMask);
+
+        // Inspired by https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentthread
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetCurrentThread();
+
+        const int MAX_SPIN_WAIT = 10000;
+
         private unsafe struct WorkItem
         {
-            public delegate* managed<int, void*, void> Func { get; init; }
-            public TaskCompletionSource TaskCompletionSource { get; init; }
-            public void* Data { get; init; }
+            public delegate* managed<int, void*, void> Func { get; set; }
+            public TaskCompletionSource TaskCompletionSource { get; set; }
+            public void* Data { get; set; }
 
             public WorkItem(delegate* managed<int, void*, void> func, TaskCompletionSource tcs, void* data)
             {
@@ -46,6 +56,11 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
         private ConcurrentQueue<WorkItem> workItems = new();
 
         /// <summary>
+        /// A bag of free work items to avoid unnecessary allocations when scheduling work.
+        /// </summary>
+        private ConcurrentBag<WorkItem> workItemsBag = new();
+
+        /// <summary>
         /// The cancelationTokenSource to be canceled when disposed.
         /// </summary>
         private CancellationTokenSource cts;
@@ -77,10 +92,16 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
                 this.threads.Add(new Thread(() => BeginThread(d, cts.Token))
                 {
                     Priority = priority,
-                    IsBackground = true
+                    IsBackground = true,
                 });
 
                 this.threads[i].Start();
+            }
+
+            // Pre-allocate work items to avoid unnecessary allocations during scheduling.
+            for (int i = 0; i < capacity; i++)
+            {
+                workItemsBag.Add(new WorkItem());
             }
         }
 
@@ -92,9 +113,23 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
 
             var tcs = new TaskCompletionSource();
 
-            workItems.Enqueue(new(func, tcs, data));
+            if (workItemsBag.TryTake(out var item))
+            {
+                item.Func = func;
+                item.Data = data;
+                item.TaskCompletionSource = tcs;
+                workItems.Enqueue(item);
+            }
+            else
+            {
+                throw new InvalidOperationException("Unable to schedule work item, no more capacity available.");
+            }
 
-            semaphore.Release();
+            lock (semaphore)
+            {
+                if (semaphore.CurrentCount < threads.Count * 2)
+                    semaphore.Release();
+            }
 
             return tcs.Task;
         }
@@ -105,23 +140,36 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
         /// <param name="threadId">The thread id that calls this Thread</param>
         private void BeginThread(int threadId, CancellationToken ct)
         {
+            // Pin the work to the performance cores to avoid unnecessary thread migrations and context switches.
+            // And to ensure that they are performing scheduled work as equally as possible.
+            Thread.BeginThreadAffinity();
+            long mask = 1L << threadId;
+            SetThreadAffinityMask(GetCurrentThread(), new IntPtr(mask));
+
             CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(ct, this.cts.Token);
             ct = cts.Token;
             while (!ct.IsCancellationRequested)
             {
-
-                // Try to retrieve a work item to work on.
-                if (workItems.TryDequeue(out var workItem))
+                for (int i = 0; i < MAX_SPIN_WAIT; i++)
                 {
-                    workItem.Func(threadId, workItem.Data);
+                    // Try to retrieve a work item to work on.
+                    if (workItems.TryDequeue(out var workItem))
+                    {
+                        workItem.Func(threadId, workItem.Data);
 
-                    // Work has been completed, set the result for the associated task.
-                    workItem.TaskCompletionSource.SetResult();
+                        // Work has been completed, set the result for the associated task.
+                        workItem.TaskCompletionSource.SetResult();
+
+                        // Return the work item to the bag to be reused for future scheduled work.
+                        workItemsBag.Add(workItem);
+
+                        i = 0; // Reset the spin wait counter to avoid yielding the thread when there is still work to do.
+                    }
+                    Thread.SpinWait(1);
                 }
-                else
-                {
-                    semaphore.Wait(ct);
-                }
+
+                // Only yield the thread when there has not been any work for a while to avoid unnecessary context switches.
+                semaphore.Wait(ct);
             }
         }
 

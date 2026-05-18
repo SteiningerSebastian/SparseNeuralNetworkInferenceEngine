@@ -14,7 +14,8 @@ Console.WriteLine("Hello, World!");
 
 const int BATCH_SIZE = 128;
 
-IThreadPool threadPool = new ThreadPool(Environment.ProcessorCount, 1024, System.Threading.ThreadPriority.Highest);
+// 6 PCores that can do the AVX instructions fast.
+IThreadPool threadPool = new ThreadPool(12, 1024, System.Threading.ThreadPriority.Highest);
 IHardwareAccelerator accelerator = new AVXHardwareAccelerator(threadPool);
 IInferenceEngine engine = new InferenceEngine(accelerator);
 
@@ -40,10 +41,29 @@ var inputLayout = new BatchValueTensorMemoryLayout(BATCH_SIZE, INPUT_SIZE);
 var inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(inputLayout, BATCH_SIZE, INPUT_SIZE);
 inputs.PopulateWithEnumerable(inps.AsSpan().Slice(0, BATCH_SIZE * INPUT_SIZE).ToArray());
 
+
 float time = 0;
+Stopwatch stopwatch = new Stopwatch();
+for (int i = 1; i < 10000; i++)
+{
+    stopwatch.Restart();
+
+    await model.InvokeAsync(inputs);
+
+    stopwatch.Stop();
+
+    time = time + 1 / (float)i * (stopwatch.ElapsedTicks * 1000000 / Stopwatch.Frequency - time);
+
+    if (i % 1000 == 0)
+    {
+        Console.WriteLine("WarmUP average time: " + stopwatch.ElapsedTicks * 1000000 / Stopwatch.Frequency + " us | average: " + time);
+    }
+}
+
+time = 0;
 for (int i = 1; i < 100000; i++)
 {
-    Stopwatch stopwatch = Stopwatch.StartNew();
+    stopwatch.Restart();
 
     await model.InvokeAsync(inputs);
 
@@ -53,6 +73,6 @@ for (int i = 1; i < 100000; i++)
 
     if (i % 1000 == 0)
     {
-        Console.WriteLine("Current average time: " + stopwatch.ElapsedTicks * 1000000/Stopwatch.Frequency + " us");
+        Console.WriteLine("Current time: " + stopwatch.ElapsedTicks * 1000000/Stopwatch.Frequency + " us | average: " + time);
     }
 }

@@ -1,4 +1,5 @@
 ﻿using BenchmarkDotNet.Running;
+using System.Threading;
 
 namespace SparseNeuralNetworkInferenceEngine.Benchmarks
 {
@@ -6,6 +7,8 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
     {
         static void Main(string[] args)
         {
+            Thread.CurrentThread.Priority = ThreadPriority.Highest;
+
             var _ = BenchmarkRunner.Run(typeof(Program).Assembly);
         }
     }

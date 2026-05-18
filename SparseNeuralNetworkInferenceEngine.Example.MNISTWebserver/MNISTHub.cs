@@ -36,7 +36,7 @@ namespace SparseNeuralNetworkInferenceEngine.Example.MNISTWebserver
             for (int i = 1; i < res.Shape[1]; i++)
             {
                 {
-                    if (res.GetValue(0, i) > res.GetValue(0, predictedNumber))
+                    if (res[0, i] > res[0, predictedNumber])
                     {
                         predictedNumber = i;
                     }

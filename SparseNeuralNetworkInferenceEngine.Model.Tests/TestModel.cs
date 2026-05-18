@@ -16,7 +16,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
         {
             Random random = new Random(0);
 
-            IThreadPool threadPool = new ThreadPool(8, 1024);
+            IThreadPool threadPool = new ThreadPool(6, 1024);
             IHardwareAccelerator accelerator = new AVXHardwareAccelerator(threadPool);
             IInferenceEngine engine = new InferenceEngine(accelerator);
 
@@ -42,7 +42,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
         [Fact]
         public async Task ModelLoadTest()
         {
-            IThreadPool threadPool = new ThreadPool(Environment.ProcessorCount, 1024);
+            IThreadPool threadPool = new ThreadPool(6, 1024);
             IHardwareAccelerator accelerator = new AVXHardwareAccelerator(threadPool);
             IInferenceEngine engine = new InferenceEngine(accelerator);
 
@@ -81,7 +81,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model.Tests
         [Fact]
         public async Task BasicMNISTInferenceTest()
         {
-            IThreadPool threadPool = new ThreadPool(1/*Environment.ProcessorCount*/, 1024);
+            IThreadPool threadPool = new ThreadPool(6, 1024);
             IHardwareAccelerator accelerator = new AVXHardwareAccelerator(threadPool);
             IInferenceEngine engine = new InferenceEngine(accelerator);
 

@@ -9,7 +9,9 @@ using ThreadPool = SparseNeuralNetworkInferenceEngine.Engine.ThreadPool;
 
 var builder = WebApplication.CreateBuilder(args);
 
-IThreadPool threadPool = new ThreadPool(Environment.ProcessorCount, 1024, ThreadPriority.BelowNormal);
+Thread.CurrentThread.Priority = ThreadPriority.Highest;
+
+IThreadPool threadPool = new ThreadPool(6, 1024, ThreadPriority.BelowNormal);
 IHardwareAccelerator accelerator = new AVXHardwareAccelerator(threadPool);
 IInferenceEngine engine = new InferenceEngine(accelerator);
 
@@ -30,7 +32,7 @@ ModelSequential model = new ModelSequential([
 // Compile the model
 model.Compile();
 
-await model.LoadAsync("E:/IUBScSparseNeuralNetworkInferenceEngine/Models/MNIST304_112_10_Sparsity_59/model_parameters.bin");
+await model.LoadAsync("E:/IUBScSNNIE/Models/MNIST304_112_10_Sparsity_59/model_parameters.bin");
 
 builder.Services.AddSingleton<IModel>(model);
 builder.Services.AddSingleton<IInferenceEngine>(engine);

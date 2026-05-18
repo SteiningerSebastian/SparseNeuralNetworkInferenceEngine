@@ -12,6 +12,7 @@ namespace SparseNeuralNetworkInferenceEngine.Model
         protected IList<ILayer> layers;
         protected IInferenceEngine engine;
         protected bool compiled = false;
+        protected SemaphoreSlim inferenceLock = new SemaphoreSlim(1);
 
         public ModelSequential(List<ILayer> layers, IInferenceEngine engine)
         {
@@ -35,11 +36,17 @@ namespace SparseNeuralNetworkInferenceEngine.Model
         public async Task<Tensor<float>> InvokeAsync(Tensor<float> tensor)
         {
             Debug.Assert(compiled, "Model needs to be compiled before it can execute.");
+
+            // Many hardware acclerators don't support concurrent inference, so we ensure that only on inference is running.
+            await inferenceLock.WaitAsync();
+
             // Call to each layer to do its part and calculate the result.
             foreach (ILayer layer in layers)
             {
                 tensor = await layer.InvokeAsync(tensor, engine);
             }
+
+            inferenceLock.Release();
 
             return tensor;
         }
@@ -51,9 +58,8 @@ namespace SparseNeuralNetworkInferenceEngine.Model
             {
                 layer.Load(enumerator);
             }
-            // TODO comment in
-            //if (enumerator.MoveNext())
-            //    throw new InvalidOperationException("Unable to load model. Enumerable contains more values than needed. (Check modell shape)");
+            if (enumerator.MoveNext())
+                throw new InvalidOperationException("Unable to load model. Enumerable contains more values than needed. (Check modell shape)");
         }
 
         /// <inheritdoc/>

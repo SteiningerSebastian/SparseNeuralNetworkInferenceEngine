@@ -22,6 +22,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
         protected GCHandle barrierGcHandle;
         protected IntPtr barrierHandlePtr;
         protected List<Task> tasks;
+        protected NativeMemoryBuffer<float>? threadedResults;
 
 
         [StructLayout(LayoutKind.Explicit, Size = 128)]
@@ -38,12 +39,11 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             [FieldOffset(52)] public int vHeightInPartition;
             [FieldOffset(56)] public int batches;
             [FieldOffset(60)] public int partitionId;
-            [FieldOffset(64)] public int threads;
-            [FieldOffset(68)] public int partitions;
+            [FieldOffset(64)] public int partitions;
 
-            [FieldOffset(72)] public IntPtr barrier;
+            [FieldOffset(68)] public IntPtr barrier;
 
-            [FieldOffset(80)] public bool applyReLU;
+            [FieldOffset(76)] public bool applyReLU;
 
             // Remaining bytes are padding.
         }
@@ -87,7 +87,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 length *= dim;
             }
 
-
             // For each thread we need a buffer of the size of the activations to cache the intermediary results.
             length *= threadPool.NumberOfThreads;
 
@@ -107,7 +106,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
         const int KERNEL_SIZE_IN_FLOATS = (Settings.KERNEL_SIZE / sizeof(float));
 
-        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public unsafe static void FusedMultiplyAddReLUWorkSequential(int threadId, void* data)
         {
             SFMAWorkItem item = (*(SFMAWorkItem*)data);
@@ -124,8 +122,8 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             int partitionId = item.partitionId;
             int partitions = item.partitions;
 
-            int hKernelsPerPartition = hKernels / item.threads;
-            int hKernelsRemaining = hKernels % item.threads;
+            int hKernelsPerPartition = hKernels / item.partitions;
+            int hKernelsRemaining = hKernels % item.partitions;
 
             Barrier barrier = (Barrier)GCHandle.FromIntPtr(item.barrier).Target!;
 
@@ -149,7 +147,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                     {
                         // For the batch start at the beginning of the weights (weights and inputs)
                         currentWeightsPtr = kernelStartWeightsPtr;
-
 
                         var vcInputs1 = Vector.LoadAligned(currentInputsPtr);
                         var vcInputs2 = Vector.LoadAligned(currentInputsPtr + Vector<float>.Count);
@@ -209,7 +206,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         var vcInputs1 = Vector.LoadAligned(currentInputsPtr);
                         var vcInputs2 = Vector.LoadAligned(currentInputsPtr + Vector<float>.Count);
 
-                        // Check if whole kernel is zero => skip sparse activations.
+                        //Check if whole kernel is zero => skip sparse activations.
                         if (!(Vector.EqualsAll(Vector<float>.Zero, vcInputs1) && Vector.EqualsAll(Vector<float>.Zero, vcInputs2)))
                         {
                             Vector<float> addents1 = Vector.LoadAligned(currentBufferPtr);
@@ -217,11 +214,12 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
                             for (int ri = 0; ri < KERNEL_SIZE_IN_FLOATS; ri++)
                             {
-                                Vector<float> vecWeights1 = Vector.LoadAligned(currentWeightsPtr);
-                                Vector<float> vecWeights2 = Vector.LoadAligned(currentWeightsPtr + Vector<float>.Count);
-
                                 float x = *currentInputsPtr; // Load the input from inputs
+
+                                Vector<float> vecWeights1 = Vector.LoadAligned(currentWeightsPtr);
                                 addents1 = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights1, addents1);
+
+                                Vector<float> vecWeights2 = Vector.LoadAligned(currentWeightsPtr + Vector<float>.Count);
                                 addents2 = Vector.FusedMultiplyAdd(Vector.Create(x), vecWeights2, addents2);
 
                                 // move the weigths point to next line.
@@ -412,7 +410,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public unsafe static void FusedMultiplyAddReLUWorkNative(int threadId, void* data)
         {
             SFMAWorkItem item = (*(SFMAWorkItem*)data);
@@ -429,8 +426,8 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             int partitionId = item.partitionId;
             int partitions = item.partitions;
 
-            int hKernelsPerPartition = hKernels / item.threads;
-            int hKernelsRemaining = hKernels % item.threads;
+            int hKernelsPerPartition = hKernels / item.partitions;
+            int hKernelsRemaining = hKernels % item.partitions;
 
             Barrier barrier = (Barrier)GCHandle.FromIntPtr(item.barrier).Target!;
 
@@ -490,6 +487,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         currentBufferPtr += KERNEL_SIZE_IN_FLOATS;
                     }
                 }
+
 
                 // The amount of rows we need to compute before moving on the the next coloumn
                 for (int r = 1; r < vHeightInPartition; r += 1)
@@ -693,7 +691,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
         }
 
         /// <inheritdoc/>
-        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public Task FusedMultiplyAdd(int batches, int[] weightsShape, Span<float> inputs, Span<float> weights, Span<float> bias, NativeMemoryOwner<float> activations, bool applyReLU = true, CancellationToken ct = default)
         {
             Debug.Assert(inputs.Length % 16 == 0 && weights.Length % 16 == 0 && bias.Length % 16 == 0, "The shape of the tensors must be divisible by 16");
@@ -704,7 +701,11 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             int vKernels = weightsShape[0] / KERNEL_SIZE_IN_FLOATS;
             int hKernels = weightsShape[1] / KERNEL_SIZE_IN_FLOATS;
 
-            Task task;
+            tasks.Clear();
+            if (threadedResults is not null)
+                // Return the buffer to the buffer manager. (This happens when called to clean up before the next invocation)
+                threadedResults.Dispose();
+
             unsafe
             {
                 // Convert the spans to points so we can work with them for the hardware accelerated caclulations
@@ -731,7 +732,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 int offsetWeights = 0;
                 int offsetInputs = 0;
 
-                var threadedResults = bufferManager.GetBuffer(activations.Data.Length * threadPool.NumberOfThreads, sizeof(float));
+                threadedResults = bufferManager.GetBuffer(activations.Data.Length * threadPool.NumberOfThreads, sizeof(float));
                 var threadedResultsBuffer = threadedResults.Buffer.Slice(0, activations.Data.Length * partitions);
 
                 if (barrier.ParticipantCount > 0)
@@ -775,7 +776,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         vHeightInPartition = vHeightInPartition,
                         batches = batches,
                         partitionId = partitionId,
-                        threads = threadPool.NumberOfThreads,
                         partitions = partitions,
                         applyReLU = applyReLU,
                         barrier = barrierHandlePtr
@@ -801,14 +801,9 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                     offsetInputs += vHeightInPartition * KERNEL_SIZE_IN_FLOATS * batches;
                 }
 
-                task = Task.WhenAll(tasks).ContinueWith(_ =>
-                {
-                    threadedResults.Dispose();
-                    tasks.Clear();
-                });
             }
 
-            return task;
+            return Task.WhenAll(tasks);
         }
 
         public void Dispose()
