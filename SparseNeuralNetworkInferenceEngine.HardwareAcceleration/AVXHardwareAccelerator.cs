@@ -23,6 +23,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
         protected IntPtr barrierHandlePtr;
         protected List<Task> tasks;
         protected NativeMemoryBuffer<float>? threadedResults;
+        protected NativeMemoryOwner<int> threadedResultsArrivedCount;
 
 
         [StructLayout(LayoutKind.Explicit, Size = 128)]
@@ -41,9 +42,9 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             [FieldOffset(60)] public int partitionId;
             [FieldOffset(64)] public int partitions;
 
-            [FieldOffset(68)] public IntPtr barrier;
-
             [FieldOffset(76)] public bool applyReLU;
+
+            [FieldOffset(77)] public int* arrivedThreadCount;
 
             // Remaining bytes are padding.
         }
@@ -68,6 +69,9 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             barrierHandlePtr = GCHandle.ToIntPtr(barrierGcHandle);
 
             tasks = new List<Task>(threadPool.NumberOfThreads);
+
+            // createing the arrived count and allign it to a cache line to avoid false sharing.
+            threadedResultsArrivedCount = new NativeMemoryOwner<int>(1, (nuint)sizeof(int), 64);
         }
 
         public object Clone()
@@ -124,8 +128,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
             int hKernelsPerPartition = hKernels / item.partitions;
             int hKernelsRemaining = hKernels % item.partitions;
-
-            Barrier barrier = (Barrier)GCHandle.FromIntPtr(item.barrier).Target!;
 
             bool applyReLU = item.applyReLU;
 
@@ -243,8 +245,16 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 }
             }
 
-            // Wait for all threads to finish the multiplication then continue to combine intermediary results.
-            barrier.SignalAndWait();
+            // Signal that this thread has finished the multiplication and wait for the others to finish as well.
+            if (Interlocked.Increment(ref *item.arrivedThreadCount) != partitions)
+            { // only if we are not the last thread to arive, we wait
+               
+                while (Volatile.Read(ref *item.arrivedThreadCount) != partitions)
+                {
+                    // Here we are on the very hot path of the code, so we want to avoid yielding the thread if possible.
+                    Thread.SpinWait(1);
+                }
+            }
 
             int cols = hKernelsPerPartition;
             // Distribute the remaining coloumns to the first few partitions.
@@ -429,8 +439,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             int hKernelsPerPartition = hKernels / item.partitions;
             int hKernelsRemaining = hKernels % item.partitions;
 
-            Barrier barrier = (Barrier)GCHandle.FromIntPtr(item.barrier).Target!;
-
             bool applyReLU = item.applyReLU;
 
             float* coloumnStartInputsPtr = currentInputsPtr;
@@ -539,8 +547,16 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 }
             }
 
-            // Wait for all threads to finish the multiplication then continue to combine intermediary results.
-            barrier.SignalAndWait();
+            // Signal that this thread has finished the multiplication and wait for the others to finish as well.
+            if (Interlocked.Increment(ref *item.arrivedThreadCount) != partitions)
+            { // only if we are not the last thread to arive, we wait
+
+                while (Volatile.Read(ref *item.arrivedThreadCount) != partitions)
+                {
+                    // Here we are on the very hot path of the code, so we want to avoid yielding the thread if possible.
+                    Thread.SpinWait(1);
+                }
+            }
 
             int cols = hKernelsPerPartition;
             // Distribute the remaining coloumns to the first few partitions.
@@ -719,6 +735,9 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 float* ptrBias = (float*)Unsafe.AsPointer(ref rBias);
                 float* ptrActivations = (float*)Unsafe.AsPointer(ref rActivations);
 
+                int* arrivedThreadCountPtr = threadedResultsArrivedCount.Pointer;
+                *arrivedThreadCountPtr = 0;
+
                 int elementsInVector = Vector<float>.Count;
 
                 SFMAWorkItem* workItems = workItemBuffer.Pointer;
@@ -778,7 +797,7 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         partitionId = partitionId,
                         partitions = partitions,
                         applyReLU = applyReLU,
-                        barrier = barrierHandlePtr
+                        arrivedThreadCount = arrivedThreadCountPtr,
                     };
 
                     Task? sfmaTask;
