@@ -7,8 +7,6 @@ namespace SparseNeuralNetworkInferenceEngine.Math
         /// <summary>
         /// The activation function that is applied.
         /// </summary>
-        /// <param name="values">An enumerable over all values.</param>
-        /// <returns>The enumerable over all values.</returns>
-        public IEnumerable<float> Invoke(IEnumerable<float> values);
+        public void Invoke(Tensor<float> values);
     }
 }

@@ -15,7 +15,7 @@ Console.WriteLine("Hello, World!");
 const int BATCH_SIZE = 128;
 
 // 6 PCores that can do the AVX instructions fast.
-IThreadPool threadPool = new ThreadPool(12, 1024, System.Threading.ThreadPriority.Highest);
+IThreadPool threadPool = new ThreadPool(6, 1024, System.Threading.ThreadPriority.Highest);
 IHardwareAccelerator accelerator = new AVXHardwareAccelerator(threadPool);
 IInferenceEngine engine = new InferenceEngine(accelerator);
 

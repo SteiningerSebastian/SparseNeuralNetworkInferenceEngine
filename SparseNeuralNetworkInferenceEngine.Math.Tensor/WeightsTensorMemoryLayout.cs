@@ -35,7 +35,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int MapToMemory(int[] index)
+        public int MapToMemory(Span<int> index)
         {
             Debug.Assert(index.Length == 2, "Unable to map index to memory offset. Only an two dimensional index is supported");
 
@@ -85,7 +85,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int[] MapToTensor(int offset)
+        public void MapToTensor(int offset, Span<int> index)
         {
             const int KERNEL_SIZE_IN_FLOATS = (Settings.KERNEL_SIZE / sizeof(float));
             const int FLOATS_PER_KERNEL = KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
@@ -123,7 +123,8 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
             int rowId = colOffset / KERNEL_SIZE_IN_FLOATS;
             int rowOffset = colOffset - rowId * KERNEL_SIZE_IN_FLOATS;
 
-            return [rowThreadStart * KERNEL_SIZE_IN_FLOATS + rowId, colId * KERNEL_SIZE_IN_FLOATS + rowOffset];
+            index[0] = rowThreadStart * KERNEL_SIZE_IN_FLOATS + rowId;
+            index[1] = colId * KERNEL_SIZE_IN_FLOATS + rowOffset;
         }
     }
 }

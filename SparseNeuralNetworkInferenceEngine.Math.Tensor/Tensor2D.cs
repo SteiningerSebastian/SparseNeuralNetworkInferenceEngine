@@ -133,50 +133,5 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
 
             throw new NotImplementedException();
         }
-
-        /// <summary>
-        /// Enumerates all elements in the given batch.
-        /// </summary>
-        /// <param name="batch">The batch to enumerate.</param>
-        /// <returns></returns>
-        protected IEnumerable<T> EnumerateValuesInBatch(int batch)
-        {
-            Debug.Assert(this.LayoutMapper.GetType() == typeof(BatchValueTensorMemoryLayout));
-            for (int i = 0; i < this.Shape[1]; i++)
-            {
-                yield return this[batch, i];
-            }
-        }
-
-        /// <summary>
-        /// Applies the given function to the tensor. If the tensor is in 
-        /// BatchValue-Layout, the function is multithreaded and applied across each
-        /// single batch.
-        /// </summary>
-        /// <param name="function">The function to apply</param>
-        /// <returns>A task that complets if all operations complete.</returns>
-        public async override Task ApplyFunction(Func<IEnumerable<T>, IEnumerable<T>> function)
-        {
-            if (LayoutMapper.GetType() == typeof(BatchValueTensorMemoryLayout))
-            {
-                for (int batch = 0; batch < this.Shape[0]; batch++)
-                {
-                    var enumerable = EnumerateValuesInBatch(batch);
-                    enumerable = function(enumerable);
-
-                    int i = 0;
-                    foreach (var v in enumerable)
-                    {
-                        this[batch, i] = v;
-                        i++;
-                    }
-
-                }
-            }
-            else
-            {
-                await base.ApplyFunction(function);
-            }
-        }
     }
 }

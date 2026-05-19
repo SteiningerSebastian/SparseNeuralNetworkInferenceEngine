@@ -11,13 +11,13 @@ namespace SparseNeuralNetworkInferenceEngine.General
         /// </summary>
         /// <param name="index">The index in the tensor.</param>
         /// <returns>The offset of the value.</returns>
-        public int MapToMemory(int[] index);
+        public int MapToMemory(Span<int> index);
 
         /// <summary>
         /// Map the offset to a index.
         /// </summary>
         /// <param name="offset">The memory offset. </param>
-        /// <returns>The corresponding index is returned.</returns>
-        public int[] MapToTensor(int offset);
+        /// <param name="index">The index in the tensor.</param>
+        public void MapToTensor(int offset, Span<int> index);
     }
 }

@@ -22,7 +22,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int MapToMemory(int[] index)
+        public int MapToMemory(Span<int> index)
         {
             // Removed by JIT Compiler in release
             Debug.Assert(index.Length == 2, "Unable to map index to memory offset. Only an two dimensional index is supported");
@@ -34,13 +34,14 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int[] MapToTensor(int offset)
+        public void MapToTensor(int offset, Span<int> index)
         {
             int c = offset / ((Settings.KERNEL_SIZE / sizeof(float)) * shape[0]);
             int o = offset % ((Settings.KERNEL_SIZE / sizeof(float)) * shape[0]);
             int b = o / (Settings.KERNEL_SIZE / sizeof(float));
             int a = o % (Settings.KERNEL_SIZE / sizeof(float)) + c * (Settings.KERNEL_SIZE / sizeof(float));
-            return [b, a];
+            index[0] = b;
+            index[1] = a;
         }
     }
 }

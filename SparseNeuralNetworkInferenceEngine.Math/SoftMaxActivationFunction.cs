@@ -18,25 +18,36 @@ namespace SparseNeuralNetworkInferenceEngine.Math
             this.length = length;
         }
 
-        public IEnumerable<float> Invoke(IEnumerable<float> values)
+        public void Invoke(Tensor<float> values)
         {
-            float sum = 0;
-            int i = 0;
-            foreach (var v in values)
-            {
-                if (i >= length)
-                    break;
-                sum += System.MathF.Exp(v);
-                i++;
-            }
+            Debug.Assert(values.GetType() == typeof(Tensor2D<float>));
 
-            i = 0;
-            foreach (float v in values)
+            var tensor = values as Tensor2D<float>;
+            var shape = tensor!.Shape;
+
+            unsafe
             {
-                if (i >= length)
-                    break;
-                yield return System.MathF.Exp(v) / sum;
-                i++;
+                // Use stackalloc to create a temporary index array for accessing tensor elements
+                // This avoids heap allocations and can improve performance when applying the softmax function.
+                Span<int> index = stackalloc int[2];
+
+                // Apply softmax over the last dimension
+                for (int b = 0; b < shape[0]; b++)
+                {
+                    float sum = 0;
+                    index[0] = b;
+                    for (int i = 0; i < length; i++)
+                    {
+                        index[1] = i;
+                        sum += System.MathF.Exp(tensor[index]);
+                    }
+
+                    for (int i = 0; i < length; i++)
+                    {
+                        index[1] = i;
+                        tensor[index] = System.MathF.Exp(tensor[index]) / sum;
+                    }
+                }
             }
         }
     }

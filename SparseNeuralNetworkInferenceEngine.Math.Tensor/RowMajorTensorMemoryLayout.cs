@@ -33,9 +33,9 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int MapToMemory(int[] index)
+        public int MapToMemory(Span<int> index)
         {
-            Debug.Assert(index.Length == shape.Length, $"Identity wrapper expects an indes of shape ({string.Join(',', shape)}) but got an index of shape ({string.Join(',', index)}).");
+            Debug.Assert(index.Length == shape.Length, $"Identity wrapper expects an indes of shape ({string.Join(',', shape)}) but got an index of shape ({string.Join(',', index.ToArray())}).");
     
             int offset = 0;
 
@@ -48,17 +48,13 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int[] MapToTensor(int offset)
+        public void MapToTensor(int offset, Span<int> index)
         {
-            int[] index = new int[shape.Length];
-
             for (int s = 0; s < shape.Length; s++)
             {
                 index[s] = offset / elementsPerDimension[s];
                 offset = offset - index[s] * (offset / elementsPerDimension[s]);
             }
-
-            return index;
         }
     }
 }

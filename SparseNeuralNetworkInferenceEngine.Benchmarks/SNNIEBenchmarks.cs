@@ -27,8 +27,9 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
     [HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.CacheMisses)]
     public class SNNIEBenchmarks
     {
-        const int BATCH_SIZE = 64;
-        const int CORE_COUNT = 14;
+        const int BATCH_SIZE = 16;
+        const int CORE_COUNT = 6;
+        const string MODEL_DIR = "E:/IUBScSNNIE/Models/Evaluation";
 
         IModel model;
         Tensor2D<float> inputs;
@@ -53,15 +54,14 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
             // Compile the model
             model.Compile();
 
-            await model.LoadAsync($"E:/IUBScSNNIE/Models/Evaluation/{path}/model_parameters.bin");
+            await model.LoadAsync($"{MODEL_DIR}/{path}/model_parameters.bin");
 
-            float[] inps = await BinaryLoader.ReadFileToFloatEnumerableAsync($"E:/IUBScSNNIE/Models/Evaluation/{path}/x_test_flattened.bin");
+            float[] inps = await BinaryLoader.ReadFileToFloatEnumerableAsync($"{MODEL_DIR}/{path}/x_test_flattened.bin");
 
             var inputLayout = new BatchValueTensorMemoryLayout(BATCH_SIZE, INPUT_SIZE);
             inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(inputLayout, BATCH_SIZE, INPUT_SIZE);
             inputs.PopulateWithEnumerable(inps.AsSpan().Slice(0, BATCH_SIZE * INPUT_SIZE).ToArray());
         }
-
 
 
         [GlobalSetup(Target = nameof(SparseneuralNetworkInferenceEngineMNISTDataset))]
@@ -124,9 +124,9 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
             // Compile the model
             model.Compile();
 
-            await model.LoadAsync($"E:/IUBScSNNIE/Models/Evaluation/{path}/model_parameters.bin");
+            await model.LoadAsync($"{MODEL_DIR}/{path}/model_parameters.bin");
 
-            float[] inps = await BinaryLoader.ReadFileToFloatEnumerableAsync($"E:/IUBScSNNIE/Models/Evaluation/{path}/x_test_flattened.bin");
+            float[] inps = await BinaryLoader.ReadFileToFloatEnumerableAsync($"{MODEL_DIR}/{path}/x_test_flattened.bin");
 
             var inputLayout = new BatchValueTensorMemoryLayout(BATCH_SIZE, INPUT_SIZE);
             inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(inputLayout, BATCH_SIZE, INPUT_SIZE);
@@ -196,9 +196,9 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
             // Compile the model
             model.Compile();
 
-            await model.LoadAsync($"E:/IUBScSNNIE/Models/Evaluation/{path}/model_parameters.bin");
+            await model.LoadAsync($"{MODEL_DIR}/{path}/model_parameters.bin");
 
-            float[] inps = await BinaryLoader.ReadFileToFloatEnumerableAsync($"E:/IUBScSNNIE/Models/Evaluation/{path}/x_test_flattened.bin");
+            float[] inps = await BinaryLoader.ReadFileToFloatEnumerableAsync($"{MODEL_DIR}/{path}/x_test_flattened.bin");
 
             var inputLayout = new BatchValueTensorMemoryLayout(BATCH_SIZE, INPUT_SIZE);
             inputs = engine.AllocateUninitializedAlignedTensor<Tensor2D<float>, float>(inputLayout, BATCH_SIZE, INPUT_SIZE);

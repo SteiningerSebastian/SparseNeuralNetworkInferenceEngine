@@ -43,7 +43,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// </summary>
         /// <param name="index">The index to identify elements.</param>
         /// <returns>The element at the given position is returned.</returns>
-        public T this[params int[] index]
+        public T this[params Span<int> index]
         {
             get
             {
@@ -90,7 +90,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// </summary>
         /// <param name="index">The index of the number.</param>
         /// <returns>The value at the index.</returns>
-        public virtual T GetValue(params int[] index)
+        public virtual T GetValue(params Span<int> index)
         {
             EnsureIndexShape(index);
             return data.Data[LayoutMapper.MapToMemory(index)];
@@ -101,7 +101,7 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// </summary>
         /// <param name="value">The value to set.</param>
         /// <param name="index">The index of the element to set.</param>
-        public virtual void SetValue(T value, params int[] index)
+        public virtual void SetValue(T value, Span<int> index)
         {
             EnsureIndexShape(index);
             data.Data[LayoutMapper.MapToMemory(index)] = value;
@@ -112,11 +112,11 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// </summary>
         /// <param name="index">The index to use to index the tensor.</param>
         /// <exception cref="ArgumentException">Is thrown if the index can't be used to index the tensor.</exception>
-        protected virtual void EnsureIndexShape(int[] index)
+        protected virtual void EnsureIndexShape(Span<int> index)
         {
             if (index.Length != shape.Length)
             {
-                throw new ArgumentException($"Can't index an tensor of shape ({string.Join(',', Shape)}) with index [{string.Join(',', index)}].");
+                throw new ArgumentException($"Can't index an tensor of shape ({string.Join(',', Shape)}) with index [{string.Join(',', index.ToArray())}].");
             }
         }
 
@@ -125,11 +125,11 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// </summary>
         /// <param name="shape">The shape to validate.</param>
         /// <exception cref="ArgumentException">Is thrown if the shapes don't match.</exception>
-        protected virtual void EnsureEqualShape(int[] shape)
+        protected virtual void EnsureEqualShape(Span<int> shape)
         {
             if (shape.Length != this.shape.Length || !shape.SequenceEqual(this.shape))
             {
-                throw new ArgumentException($"Operation on tensors of shape ({string.Join(',', this.shape)}) and ({string.Join(',', shape)}) is not supported.");
+                throw new ArgumentException($"Operation on tensors of shape ({string.Join(',', this.shape)}) and ({string.Join(',', shape.ToArray())}) is not supported.");
             }
         }
 
@@ -244,9 +244,9 @@ namespace SparseNeuralNetworkInferenceEngine.Math.Tensor
         /// </summary>
         /// <param name="function">The function to apply.</param>
         /// <returns>Returns a task theat finishes when the function is applied.</returns>
-        public async virtual Task ApplyFunction(Func<IEnumerable<T>, IEnumerable<T>> function)
-        {
-            this.PopulateWithEnumerable(function(this)); // Apply function to each element.
+        public async virtual Task ApplyFunction(Action<Tensor<T>> function)
+        { 
+            function(this); // Apply function to each element.
         }
 
         IEnumerator IEnumerable.GetEnumerator()

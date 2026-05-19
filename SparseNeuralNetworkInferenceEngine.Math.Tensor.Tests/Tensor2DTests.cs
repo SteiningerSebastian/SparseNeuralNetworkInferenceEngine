@@ -22,7 +22,8 @@ namespace Math.Tensor.Tests
             var mapper = new BatchValueTensorMemoryLayout(64, 64);
 
             int offset = mapper.MapToMemory([b, a]);
-            int[] index = mapper.MapToTensor(offset);
+            int[] index = new int[2];
+            mapper.MapToTensor(offset, index);
 
             Assert.Equal(b, index[0]);
             Assert.Equal(a, index[1]);
@@ -210,7 +211,7 @@ namespace Math.Tensor.Tests
             var mapper = new WeightsTensorMemoryLayout([d1, d2], p);
             var values = Enumerable.Range(0, d1 * d2).ToArray();
 
-            var indexes = values.Select(a => mapper.MapToTensor(a)).ToArray();
+            var indexes = values.Select(a => { int[] index = new int[2]; mapper.MapToTensor(a, index); return index; }).ToArray();
 
             var restoredValues = indexes.Select(a => mapper.MapToMemory(a)).ToArray();
 

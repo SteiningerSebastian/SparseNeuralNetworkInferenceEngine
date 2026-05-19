@@ -17,7 +17,7 @@ IInferenceEngine engine = new InferenceEngine(accelerator);
 
 // For simplicity we use a batch size of 1 for the webserver, but the model can be compiled with any batch size and input size as long as they are multiples of 16.
 // In a production environment you would want to use a larger batch size to maximize throughput, but for this example we want to minimize latency and make it easier to test with single inputs.
-const int BATCH_SIZE = 1;
+const int BATCH_SIZE = 16;
 const int INPUT_SIZE = 784;
 
 ModelSequential model = new ModelSequential([
