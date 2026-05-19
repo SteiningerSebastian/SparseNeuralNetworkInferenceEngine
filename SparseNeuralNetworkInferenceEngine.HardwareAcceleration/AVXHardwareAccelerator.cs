@@ -18,9 +18,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
         protected IThreadPool threadPool;
         protected NativeMemoryBufferManager<float> bufferManager;
         protected NativeMemoryOwner<SFMAWorkItem> workItemBuffer;
-        protected Barrier barrier;
-        protected GCHandle barrierGcHandle;
-        protected IntPtr barrierHandlePtr;
         protected List<Task> tasks;
         protected NativeMemoryBuffer<float>? threadedResults;
         protected NativeMemoryOwner<int> threadedResultsArrivedCount;
@@ -63,10 +60,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
             // Preallocate the buffers for the inter-thread communication.
 
             workItemBuffer = new NativeMemoryOwner<SFMAWorkItem>((nuint)threadPool.NumberOfThreads, (nuint)128, 64);
-
-            barrier = new Barrier(0);
-            barrierGcHandle = GCHandle.Alloc(barrier);
-            barrierHandlePtr = GCHandle.ToIntPtr(barrierGcHandle);
 
             tasks = new List<Task>(threadPool.NumberOfThreads);
 
@@ -754,9 +747,12 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                 threadedResults = bufferManager.GetBuffer(activations.Data.Length * threadPool.NumberOfThreads, sizeof(float));
                 var threadedResultsBuffer = threadedResults.Buffer.Slice(0, activations.Data.Length * partitions);
 
-                if (barrier.ParticipantCount > 0)
-                    barrier.RemoveParticipants(barrier.ParticipantCount);
-                barrier.AddParticipants(partitions);
+                var rawBuffer = threadedResultsBuffer;
+
+                // Get a pointer to said buffer.
+                ref float rRawBuffer = ref MemoryMarshal.GetReference(rawBuffer);
+                float* ptrRawBuffer = (float*)Unsafe.AsPointer(ref rRawBuffer);
+                float* ptrBuffer = ptrRawBuffer;
 
                 // For each partition produce the intermediary result of x*W
                 for (int i = 0; i < partitions; i += 1)
@@ -767,13 +763,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         vHeightInPartition++;
                         vKernelsRemaining--;
                     }
-
-                    var rawBuffer = threadedResultsBuffer;
-
-                    // Get a pointer to said buffer.
-                    ref float rRawBuffer = ref MemoryMarshal.GetReference(rawBuffer);
-                    float* ptrRawBuffer = (float*)Unsafe.AsPointer(ref rRawBuffer);
-                    float* ptrBuffer = ptrRawBuffer + i * activations.Data.Length;
 
                     // Calculate the pointers this work-item needs.
                     float* currentWeightsPtr = ptrWeights + offsetWeights;
@@ -818,6 +807,8 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
                     offsetWeights += vHeightInPartition * hKernels * KERNEL_SIZE_IN_FLOATS * KERNEL_SIZE_IN_FLOATS;
                     offsetInputs += vHeightInPartition * KERNEL_SIZE_IN_FLOATS * batches;
+
+                    ptrBuffer += activations.Data.Length;
                 }
 
             }
@@ -827,7 +818,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
 
         public void Dispose()
         {
-            barrierGcHandle.Free(); // Dispose of the no longer needed barrier
         }
     }
 }
