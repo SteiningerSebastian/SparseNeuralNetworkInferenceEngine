@@ -18,7 +18,7 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
     [HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.CacheMisses)]
     public class ONNXBenchmarks
     {
-        const int BATCH_SIZE = 16;
+        const int BATCH_SIZE = 64;
         const string MODEL_DIR = "E:/IUBScSNNIE/Models/Evaluation";
 
         protected InferenceSession session;
@@ -30,7 +30,7 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
             // You can adjust these settings as needed for your specific hardware and use case. (only 6 P-Cores on the ultra 9 285H)
             SessionOptions sessionOptions = new SessionOptions();
             sessionOptions.IntraOpNumThreads = 6;
-            sessionOptions.AddSessionConfigEntry("session.intra_op_thread_affinities", "0;1;2;3;4;5");
+            sessionOptions.AddSessionConfigEntry("session.intra_op_thread_affinities", "1;2;3;4;5");
             return sessionOptions;
         }
 

@@ -12,7 +12,7 @@ using ThreadPool = SparseNeuralNetworkInferenceEngine.Engine.ThreadPool;
 
 Console.WriteLine("Hello, World!");
 
-const int BATCH_SIZE = 128;
+const int BATCH_SIZE = 64;
 
 // 6 PCores that can do the AVX instructions fast.
 IThreadPool threadPool = new ThreadPool(6, 1024, System.Threading.ThreadPriority.Highest);

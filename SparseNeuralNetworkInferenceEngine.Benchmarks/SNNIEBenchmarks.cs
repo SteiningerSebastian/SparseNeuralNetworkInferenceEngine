@@ -27,7 +27,7 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
     [HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.CacheMisses)]
     public class SNNIEBenchmarks
     {
-        const int BATCH_SIZE = 16;
+        const int BATCH_SIZE = 64;
         const int CORE_COUNT = 6;
         const string MODEL_DIR = "E:/IUBScSNNIE/Models/Evaluation";
 
