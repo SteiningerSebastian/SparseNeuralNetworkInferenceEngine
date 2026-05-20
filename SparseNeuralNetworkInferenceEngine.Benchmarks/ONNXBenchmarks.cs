@@ -18,7 +18,7 @@ namespace SparseNeuralNetworkInferenceEngine.Benchmarks
     [HardwareCounters(HardwareCounter.BranchMispredictions, HardwareCounter.CacheMisses)]
     public class ONNXBenchmarks
     {
-        const int BATCH_SIZE = 64;
+        const int BATCH_SIZE = 128;
         const string MODEL_DIR = "E:/IUBScSNNIE/Models/Evaluation";
 
         protected InferenceSession session;
