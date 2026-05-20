@@ -119,16 +119,12 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
                 item.Data = data;
                 item.TaskCompletionSource = tcs;
                 workItems.Enqueue(item);
+
+                semaphore.Release();
             }
             else
             {
                 throw new InvalidOperationException("Unable to schedule work item, no more capacity available.");
-            }
-
-            lock (semaphore)
-            {
-                if (semaphore.CurrentCount < threads.Count * 2)
-                    semaphore.Release();
             }
 
             return tcs.Task;
@@ -148,13 +144,17 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
 
             CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(ct, this.cts.Token);
             ct = cts.Token;
+            WorkItem workItem;
             while (!ct.IsCancellationRequested)
             {
                 for (int i = 0; i < MAX_SPIN_WAIT; i++)
                 {
                     // Try to retrieve a work item to work on.
-                    if (workItems.TryDequeue(out var workItem))
+                    if (workItems.TryDequeue(out workItem))
                     {
+                        // If the semaphore was acquired, we need to release it to avoid busy waiting.
+                        semaphore.Wait(0);
+
                         workItem.Func(threadId, workItem.Data);
 
                         // Work has been completed, set the result for the associated task.
@@ -170,6 +170,17 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
 
                 // Only yield the thread when there has not been any work for a while to avoid unnecessary context switches.
                 semaphore.Wait(ct);
+
+                if (workItems.TryDequeue(out workItem))
+                {
+                    workItem.Func(threadId, workItem.Data);
+
+                    // Work has been completed, set the result for the associated task.
+                    workItem.TaskCompletionSource.SetResult();
+
+                    // Return the work item to the bag to be reused for future scheduled work.
+                    workItemsBag.Add(workItem);
+                }
             }
         }
 
