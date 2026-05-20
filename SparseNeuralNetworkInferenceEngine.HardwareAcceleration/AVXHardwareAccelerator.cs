@@ -503,7 +503,6 @@ namespace SparseNeuralNetworkInferenceEngine.HardwareAcceleration
                         // For the batch start at the beginning of the weights (weights and inputs)
                         currentWeightsPtr = kernelStartWeightsPtr;
 
-
                         var vcInputs = Vector.LoadAligned(currentInputsPtr);
 
                         // Check if whole kernel is zero => skip sparse activations.
