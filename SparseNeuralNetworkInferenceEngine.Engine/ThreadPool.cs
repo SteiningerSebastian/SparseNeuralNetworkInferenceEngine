@@ -181,6 +181,12 @@ namespace SparseNeuralNetworkInferenceEngine.Engine
                     // Return the work item to the bag to be reused for future scheduled work.
                     workItemsBag.Add(workItem);
                 }
+                else
+                {
+                    // If we were released but someone else worked on it, we need to releas
+                    // them as they after retriving the workItem also wait.
+                    semaphore.Release();
+                }
             }
         }
 
